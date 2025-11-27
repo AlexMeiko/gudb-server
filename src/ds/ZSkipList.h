@@ -7,8 +7,7 @@
 struct ZSkipListNode {
     double score;
     std::string value;
-    ZSkipListNode* next;
+    ZSkipListNode *next;
 };
 
-class ZSkipList {
-};
+class ZSkipList {};
