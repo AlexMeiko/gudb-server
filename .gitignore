@@ -1,0 +1,119 @@
+# .gitignore for gudb-server (C++ / CMake / CLion / VSCode project)
+# Generated based on repository layout and common C++/CMake build artifacts.
+
+############################################################
+# Build directories and artifacts
+############################################################
+
+# CLion / CMake build directories
+cmake-build-*/
+build/
+out/
+bin/
+lib/
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+install_manifest.txt
+Makefile
+cmake.check_cache
+cmake.check_cache*
+cmake_install.cmake
+*Makefile
+progress.marks
+compile_commands.json
+
+# Object files, libraries and executables
+*.o
+*.obj
+*.lo
+*.slo
+*.a
+*.lib
+*.so
+*.dll
+*.dylib
+*.exe
+*.out
+*.core
+
+############################################################
+# IDEs and editors
+############################################################
+
+# JetBrains IDEs (CLion)
+.idea/
+*.iml
+*.iws
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# Visual Studio
+*.suo
+*.user
+*.userosscache
+*.sdf
+*.VC.db
+*.VC.VC.opendb
+
+# Other editors and temp files
+*~
+*.swp
+*.swo
+*.sav
+*.tmp
+*.temp
+*.bak
+*.orig
+
+############################################################
+# OS generated files
+############################################################
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+Icon?
+
+# Linux
+.directory
+
+############################################################
+# Logs, coverage, and reports
+############################################################
+
+*.log
+*.log.*
+*.csv
+*.gcda
+*.gcno
+*.gcov
+coverage/
+coverage.*
+TestResults/
+Testing/Temporary/
+
+############################################################
+# Misc
+############################################################
+
+# ccache
+.ccache/
+
+# Tag files
+tags
+ctags
+
+# Temporary run files
+*.pid
+*.seed
