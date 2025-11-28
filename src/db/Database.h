@@ -126,6 +126,26 @@ namespace gudb {
             }
         }
 
+        // 获取 key 的剩余生存时间（毫秒）
+        // 返回值：-1 表示没有设置过期时间，-2 表示 key 不存在或已过期
+        long long ttl(const std::string &key) {
+            auto it = data_.find(key);
+            if (it == data_.end()) {
+                return -2;  // key 不存在
+            }
+            
+            if (it->second.expiresAt == -1) {
+                return -1;  // 没有设置过期时间
+            }
+            
+            auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()
+            ).count();
+            
+            long long remaining = it->second.expiresAt - now;
+            return remaining > 0 ? remaining : -2;  // 已过期返回 -2
+        }
+
     private:
         std::unordered_map<std::string, Object> data_;
 

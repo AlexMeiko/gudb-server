@@ -104,9 +104,63 @@ namespace gudb::cmd {
     // KEYS	查找所有符合给定模式的 key
     // MOVE	将当前数据库的 key 移动到给定的数据库中
     // PERSIST	移除 key 的过期时间，key 将持久保持
+    std::string persistCommand(const std::vector<std::string> &args, Database &db) {
+        if (args.size() != 2) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'persist' command");
+        }
+
+        const std::string &key = args[1];
+
+        if (!db.exists(key)) {
+            return protocol::Encoder::encodeInteger(0);
+        }
+
+        db.persist(key);
+        return protocol::Encoder::encodeInteger(1);
+    }
+
     // PTTL	以毫秒为单位返回 key 的剩余的过期时间
-    // TTL	以秒为单位，返回给定 key 的剩余生存时间(
+    std::string pttlCommand(const std::vector<std::string> &args, Database &db) {
+        if (args.size() != 2) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'pttl' command");
+        }
+
+        const std::string &key = args[1];
+
+        if (!db.exists(key)) {
+            return protocol::Encoder::encodeInteger(-2);
+        }
+
+        return protocol::Encoder::encodeInteger(db.ttl(key));
+    }
+
+    // TTL	以秒为单位，返回给定 key 的剩余生存时间
+    std::string ttlCommand(const std::vector<std::string> &args, Database &db) {
+        if (args.size() != 2) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'ttl' command");
+        }
+
+        const std::string &key = args[1];
+
+        if (!db.exists(key)) {
+            return protocol::Encoder::encodeInteger(-2);
+        }
+
+        long long ttlMs = db.ttl(key);
+
+        // 特殊返回值
+        if (ttlMs <= -1) {
+            return protocol::Encoder::encodeInteger(ttlMs);
+        }
+
+        return protocol::Encoder::encodeInteger(ttlMs / 1000);
+    }
+
     // RANDOMKEY	从当前数据库中随机返回一个 key
+    std::string randomkeyCommand(const std::vector<std::string> &args, Database &db) {
+
+    }
+
     // RENAME	修改 key 的名称
     std::string renameCommand(const std::vector<std::string> &args, Database &db) {
         if (args.size() != 3) {
@@ -179,6 +233,9 @@ namespace gudb::cmd {
     static AutoRegister reg_expireat("EXPIREAT", expireatCommand);
     static AutoRegister reg_pexpire("PEXPIRE", pexpireCommand);
     static AutoRegister reg_pexpireat("PEXPIREAT", pexpireatCommand);
+    static AutoRegister reg_persist("PERSIST", persistCommand);
+    static AutoRegister reg_pttl("PTTL", pttlCommand);
+    static AutoRegister reg_ttl("TTL", ttlCommand);
     static AutoRegister reg_rename("RENAME", renameCommand);
     static AutoRegister reg_renamenx("RENAMENX", renameNXCommand);
     static AutoRegister reg_type("TYPE", typeCommand);

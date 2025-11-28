@@ -20,3 +20,8 @@ target_link_libraries(gudb-server
 target_include_directories(gudb-server PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
+
+# 安装
+install(TARGETS gudb-server
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
