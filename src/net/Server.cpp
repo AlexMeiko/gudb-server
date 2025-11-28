@@ -7,6 +7,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <cstring>
+#include <memory>
+#include <string>
 
 namespace gudb::net {
     Server::Server(Database *db) : epollFd_(-1), listenFd_(-1), db_(db) {
@@ -125,7 +127,7 @@ namespace gudb::net {
 
             connections_[clientFd] = std::make_unique<Connection>(clientFd, db_);
             LOG_INFO("New connection from " + std::string(inet_ntoa(clientAddr.sin_addr)) +
-                ":" + std::to_string(ntohs(clientAddr.sin_port)));
+                     ":" + std::to_string(ntohs(clientAddr.sin_port)));
         }
     }
 

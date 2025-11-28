@@ -1,4 +1,5 @@
 #include "Parser.h"
+#include <string>
 
 namespace gudb::protocol {
     ParseResult Parser::parse(core::Buffer &buffer, std::vector<std::string> &outArgs) {

@@ -1,4 +1,7 @@
 #include "Encoder.h"
+#include <string>
+#include <cstdint>
+#include <string>
 
 namespace gudb::protocol {
     std::string Encoder::encodeNull() {

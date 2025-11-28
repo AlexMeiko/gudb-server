@@ -1,5 +1,6 @@
 #include "Buffer.h"
 #include <algorithm>
+#include <iterator>
 
 namespace gudb::core {
     // 向缓冲区追加数据

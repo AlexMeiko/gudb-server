@@ -1,6 +1,7 @@
 #include "Registry.h"
-#include <numeric>
 #include "../protocol/Encoder.h"
+#include <algorithm>
+#include <chrono>
 
 namespace gudb::cmd {
     // DEL 用于删除 key
@@ -25,11 +26,81 @@ namespace gudb::cmd {
         );
     }
 
+    // PEXPIRE	设置 key 的过期时间，以毫秒计
+    std::string pexpireCommand(const std::vector<std::string> &args, Database &db) {
+        if (args.size() != 3) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'pexpire' command");
+        }
+
+        const std::string &key = args[1];
+
+        // 检查 key 是否存在
+        if (!db.exists(key)) {
+            return protocol::Encoder::encodeInteger(0);
+        }
+
+        try {
+            long long delta = std::stoll(args[2]);
+
+            // 获取当前时间戳（毫秒）
+            auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()
+            ).count();
+
+            db.setExpire(key, now + delta);
+
+            return protocol::Encoder::encodeInteger(1);
+        } catch (const std::exception &e) {
+            return protocol::Encoder::encodeError("ERR value is not an integer or out of range");
+        }
+    }
+
+    // PEXPIREAT	设置 key 过期时间的时间戳(unix timestamp)，以毫秒计
+    std::string pexpireatCommand(const std::vector<std::string> &args, Database &db) {
+        if (args.size() != 3) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'pexpireat' command");
+        }
+
+        const std::string &key = args[1];
+
+        // 检查 key 是否存在
+        if (!db.exists(key)) {
+            return protocol::Encoder::encodeInteger(0);
+        }
+
+        try {
+            //毫秒时间戳
+            long long timestamp = std::stoll(args[2]);
+
+            db.setExpire(key, timestamp);
+
+            return protocol::Encoder::encodeInteger(1);
+        } catch (const std::exception &e) {
+            return protocol::Encoder::encodeError("ERR value is not an integer or out of range");
+        }
+    }
+
 
     // EXPIRE	为给定 key 设置过期时间
+    std::string expireCommand(std::vector<std::string> &args, Database &db) {
+        if (args.size() != 3) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'expire' command");
+        }
+
+        args[2].append("000");
+        return pexpireCommand(args, db);
+    }
+
     // EXPIREAT	用于为 key 设置过期时间，接受的时间参数是 UNIX 时间戳
-    // PEXPIRE	设置 key 的过期时间，以毫秒计
-    // PEXPIREAT	设置 key 过期时间的时间戳(unix timestamp)，以毫秒计
+    std::string expireatCommand(std::vector<std::string> &args, Database &db) {
+        if (args.size() != 3) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'expireat' command");
+        }
+
+        args[2].append("000");
+        return pexpireatCommand(args, db);
+    }
+
     // KEYS	查找所有符合给定模式的 key
     // MOVE	将当前数据库的 key 移动到给定的数据库中
     // PERSIST	移除 key 的过期时间，key 将持久保持
@@ -104,6 +175,10 @@ namespace gudb::cmd {
     // 自注册
     static AutoRegister reg_del("DEL", delCommand);
     static AutoRegister reg_exists("EXISTS", existsCommand);
+    static AutoRegister reg_expire("EXPIRE", expireCommand);
+    static AutoRegister reg_expireat("EXPIREAT", expireatCommand);
+    static AutoRegister reg_pexpire("PEXPIRE", pexpireCommand);
+    static AutoRegister reg_pexpireat("PEXPIREAT", pexpireatCommand);
     static AutoRegister reg_rename("RENAME", renameCommand);
     static AutoRegister reg_renamenx("RENAMENX", renameNXCommand);
     static AutoRegister reg_type("TYPE", typeCommand);
