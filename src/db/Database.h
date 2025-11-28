@@ -65,6 +65,36 @@ namespace gudb {
             return data_.erase(key) > 0;
         }
 
+        //改键名
+        bool rename(const std::string &oldKey, const std::string &newKey, bool overwrite = true) {
+            if (oldKey == newKey) {
+                if (expireIfNeeded(oldKey)) return false;
+                return data_.find(oldKey) != data_.end();
+            }
+
+            // 源键必须存在且未过期
+            if (expireIfNeeded(oldKey)) return false;
+            expireIfNeeded(newKey);
+
+            // 拿出节点
+            auto nh = data_.extract(oldKey);
+            if (nh.empty()) return false;
+
+            if (!overwrite && data_.find(newKey) != data_.end()) {
+                data_.insert(std::move(nh)); // 放回去
+                return false;
+            }
+
+            // 覆盖：若目标存在，删掉
+            if (overwrite) data_.erase(newKey);
+
+            // 改名并插回
+            nh.key() = newKey;
+            data_.insert(std::move(nh));
+
+            return true;
+        }
+
         // 获取数据库大小
         size_t size() const { return data_.size(); }
 
