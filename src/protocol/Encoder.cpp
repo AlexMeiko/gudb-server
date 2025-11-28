@@ -1,7 +1,13 @@
 #include "Encoder.h"
 #include <string>
 #include <cstdint>
-#include <string>
+
+#if __cpp_lib_format >= 202110L
+#include <format>
+#define USE_STD_FORMAT
+#else
+#include <sstream>
+#endif
 
 namespace gudb::protocol {
     std::string Encoder::encodeNull() {
@@ -20,15 +26,33 @@ namespace gudb::protocol {
         if (str.empty()) {
             return "$0\r\n\r\n";
         }
-        return "$" + std::to_string(str.size()) + "\r\n" + str + "\r\n";
+#ifdef USE_STD_FORMAT
+        return std::format("${}\r\n{}\r\n", str.size(), str);
+#else
+        std::ostringstream oss;
+        oss << "$" << str.size() << "\r\n" << str << "\r\n";
+        return oss.str();
+#endif
     }
 
     std::string Encoder::encodeInteger(int64_t value) {
-        return ":" + std::to_string(value) + "\r\n";
+#ifdef USE_STD_FORMAT
+        return std::format(":{}\r\n", value);
+#else
+        std::ostringstream oss;
+        oss << ":" << value << "\r\n";
+        return oss.str();
+#endif
     }
 
     std::string Encoder::encodeArray(const std::vector<std::string> &arr) {
-        std::string result = "*" + std::to_string(arr.size()) + "\r\n";
+#ifdef USE_STD_FORMAT
+        std::string result = std::format("*{}\r\n", arr.size());
+#else
+        std::ostringstream oss;
+        oss << "*" << arr.size() << "\r\n";
+        std::string result = oss.str();
+#endif
         for (const auto &elem: arr)
             result += encodeBulkString(elem);
         return result;
