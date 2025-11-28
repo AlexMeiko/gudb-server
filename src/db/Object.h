@@ -27,7 +27,7 @@ public:
     ObjType type;
     long long expiresAt = -1; // 过期时间戳（毫秒），-1 表示永不过期
 
-    Object() {};
+    Object() : value(GString{}), type(ObjType::STRING) {}
 
     explicit Object(GString s) : value(std::move(s)), type(ObjType::STRING) {}
 

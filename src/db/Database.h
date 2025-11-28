@@ -11,7 +11,7 @@ namespace gudb {
 
         // 检查键是否存在（读取类命令使用）
         bool exists(const std::string &key) {
-            return expireIfNeeded(key) == false && data_.find(key) != data_.end();
+            return expireIfNeeded(key) == false && data_.contains(key);
         }
 
         // 获取值（如果键不存在或已过期，返回 nullptr）
@@ -69,7 +69,7 @@ namespace gudb {
         bool rename(const std::string &oldKey, const std::string &newKey, bool overwrite = true) {
             if (oldKey == newKey) {
                 if (expireIfNeeded(oldKey)) return false;
-                return data_.find(oldKey) != data_.end();
+                return data_.contains(oldKey);
             }
 
             // 源键必须存在且未过期
@@ -80,7 +80,7 @@ namespace gudb {
             auto nh = data_.extract(oldKey);
             if (nh.empty()) return false;
 
-            if (!overwrite && data_.find(newKey) != data_.end()) {
+            if (!overwrite && data_.contains(newKey)) {
                 data_.insert(std::move(nh)); // 放回去
                 return false;
             }
@@ -131,19 +131,19 @@ namespace gudb {
         long long ttl(const std::string &key) {
             auto it = data_.find(key);
             if (it == data_.end()) {
-                return -2;  // key 不存在
+                return -2; // key 不存在
             }
-            
+
             if (it->second.expiresAt == -1) {
-                return -1;  // 没有设置过期时间
+                return -1; // 没有设置过期时间
             }
-            
+
             auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::system_clock::now().time_since_epoch()
             ).count();
-            
+
             long long remaining = it->second.expiresAt - now;
-            return remaining > 0 ? remaining : -2;  // 已过期返回 -2
+            return remaining > 0 ? remaining : -2; // 已过期返回 -2
         }
 
     private:
