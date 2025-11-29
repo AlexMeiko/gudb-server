@@ -1,26 +1,66 @@
 #include "Parser.h"
+#include <algorithm>
 #include <string>
+#include <vector>
 
 namespace gudb::protocol {
-    ParseResult Parser::parse(core::Buffer &buffer, std::vector<std::string> &outArgs) {
+    // BufferReader 辅助类，用于不修改原 Buffer 的情况下进行预读取
+    class Parser::BufferReader {
+    public:
+        explicit BufferReader(core::Buffer &buffer) : buffer_(buffer), offset_(0) {}
+
+        size_t readableBytes() const { return buffer_.readableBytes() - offset_; }
+
+        const char *peek() const { return buffer_.peek() + offset_; }
+
+        void retrieve(size_t len) { offset_ += len; }
+
+        std::string retrieveUntilCrlf() {
+            const char *start = peek();
+            const char *end = buffer_.peek() + buffer_.readableBytes();
+            const char *crlf = std::search(start, end, "\r\n", std::next("\r\n", 2));
+
+            if (crlf == end) {
+                return "";
+            }
+
+            std::string res(start, crlf);
+            retrieve(res.size() + 2);
+            return res;
+        }
+
+        size_t bytesConsumed() const { return offset_; }
+
+    private:
+        core::Buffer &buffer_;
+        size_t offset_;
+    };
+
+    ParseResult Parser::parse(core::Buffer &buffer,
+                              std::vector<std::string> &outArgs) {
         if (buffer.readableBytes() == 0) {
             return ParseResult::WAIT;
         }
 
-        char first = *buffer.peek();
-        // 当前仅支持 RESP 数组请求，其他前缀视为协议错误
+        BufferReader reader(buffer);
+        char first = *reader.peek();
 
         if (first == '*') {
-            return parseArray(buffer, outArgs);
+            ParseResult res = parseArray(reader, outArgs);
+            if (res == ParseResult::OK) {
+                // 解析成功，消耗 Buffer 数据
+                buffer.retrieve(reader.bytesConsumed());
+            }
+            return res;
         }
 
         return ParseResult::ERROR;
     }
 
-    ParseResult Parser::parseArray(core::Buffer &buffer, std::vector<std::string> &outArgs) {
-        std::string line = buffer.retrieveUntilCrlf();
+    ParseResult Parser::parseArray(BufferReader &reader,
+                                   std::vector<std::string> &outArgs) {
+        std::string line = reader.retrieveUntilCrlf();
         if (line.empty()) {
-            // "*<count>\r\n" 尚未收全，继续等待
             return ParseResult::WAIT;
         }
 
@@ -28,7 +68,13 @@ namespace gudb::protocol {
             return ParseResult::ERROR;
         }
 
-        int count = std::stoi(line.substr(1));
+        int count;
+        try {
+            count = std::stoi(line.substr(1));
+        } catch (...) {
+            return ParseResult::ERROR;
+        }
+
         if (count <= 0) {
             return ParseResult::ERROR;
         }
@@ -37,7 +83,7 @@ namespace gudb::protocol {
 
         for (int i = 0; i < count; ++i) {
             std::string arg;
-            ParseResult res = parseBulkString(buffer, arg);
+            ParseResult res = parseBulkString(reader, arg);
             if (res != ParseResult::OK) {
                 return res;
             }
@@ -47,8 +93,8 @@ namespace gudb::protocol {
         return ParseResult::OK;
     }
 
-    ParseResult Parser::parseBulkString(core::Buffer &buffer, std::string &out) {
-        std::string line = buffer.retrieveUntilCrlf();
+    ParseResult Parser::parseBulkString(BufferReader &reader, std::string &out) {
+        std::string line = reader.retrieveUntilCrlf();
         if (line.empty()) {
             return ParseResult::WAIT;
         }
@@ -57,20 +103,24 @@ namespace gudb::protocol {
             return ParseResult::ERROR;
         }
 
-        int len = std::stoi(line.substr(1));
+        int len;
+        try {
+            len = std::stoi(line.substr(1));
+        } catch (...) {
+            return ParseResult::ERROR;
+        }
+
         if (len < 0) {
-            // RESP 协议中的空值，返回空字符串占位
             out = "";
             return ParseResult::OK;
         }
 
-        if (buffer.readableBytes() < static_cast<size_t>(len) + 2) {
-            // 数据区或末尾 CRLF 未到齐，保持等待
+        if (reader.readableBytes() < static_cast<size_t>(len) + 2) {
             return ParseResult::WAIT;
         }
 
-        out.assign(buffer.peek(), len);
-        buffer.retrieve(len + 2);
+        out.assign(reader.peek(), len);
+        reader.retrieve(len + 2);
 
         return ParseResult::OK;
     }

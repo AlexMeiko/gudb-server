@@ -47,18 +47,6 @@ namespace gudb::core {
          */
         size_t readableBytes() const;
 
-        /**
-         * @brief 读取直到CRLF(\r\\n)的数据
-         *
-         * 从当前读指针位置开始，查找第一个CRLF（回车换行）标记。
-         * 如果找到，返回从读指针到CRLF之间的字符串（不包含CRLF），
-         * 并将读指针移动到CRLF之后的位置。
-         * 如果未找到CRLF，返回空字符串。
-         *
-         * @return std::string 读取到的字符串（不包含CRLF）
-         */
-        std::string retrieveUntilCrlf();
-
     private:
         std::vector<char> buf_;
         size_t readIndex_ = 0;

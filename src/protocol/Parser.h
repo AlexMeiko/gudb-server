@@ -11,8 +11,10 @@ namespace gudb::protocol {
         ParseResult parse(core::Buffer &buffer, std::vector<std::string> &outArgs);
 
     private:
-        ParseResult parseArray(core::Buffer &buffer, std::vector<std::string> &outArgs);
+        class BufferReader;
 
-        ParseResult parseBulkString(core::Buffer &buffer, std::string &out);
+        ParseResult parseArray(BufferReader &reader, std::vector<std::string> &outArgs);
+
+        ParseResult parseBulkString(BufferReader &reader, std::string &out);
     };
 } // namespace gudb::protocol

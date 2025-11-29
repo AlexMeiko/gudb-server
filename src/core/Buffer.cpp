@@ -32,26 +32,4 @@ namespace gudb::core {
             readIndex_ += len;
         }
     }
-
-    // 读取到CRLF(\r\n)的数据
-    std::string Buffer::retrieveUntilCrlf() {
-        // 获取当前可读数据的起始和结束位置
-        const char *begin = peek();
-        const char *end = buf_.data() + writeIndex_;
-
-        const char *crlf = std::search(begin, end, "\r\n", std::next("\r\n", 2));
-
-        // 如果未找到CRLF，返回空字符串
-        if (crlf == end) {
-            return "";
-        }
-
-
-        std::string res(begin, crlf);
-
-        // 移除已读取的数据（包括CRLF的2个字节）
-        retrieve(res.size() + 2);
-
-        return res;
-    }
 } // namespace gudb::core
