@@ -29,15 +29,15 @@ public:
 
     Object() : value(GString{}), type(ObjType::STRING) {}
 
-    explicit Object(GString s) : value(std::move(s)), type(ObjType::STRING) {}
+    explicit Object(GString s, long long expire = -1) : value(std::move(s)), type(ObjType::STRING), expiresAt(expire) {}
 
-    explicit Object(GList l) : value(std::move(l)), type(ObjType::LIST) {}
+    explicit Object(GList l, long long expire = -1) : value(std::move(l)), type(ObjType::LIST), expiresAt(expire) {}
 
-    explicit Object(GHash h) : value(std::move(h)), type(ObjType::HASH) {}
+    explicit Object(GHash h, long long expire = -1) : value(std::move(h)), type(ObjType::HASH), expiresAt(expire) {}
 
-    explicit Object(GSet s) : value(std::move(s)), type(ObjType::SET) {}
+    explicit Object(GSet s, long long expire = -1) : value(std::move(s)), type(ObjType::SET), expiresAt(expire) {}
 
-    explicit Object(GZSet s) : value(std::move(s)), type(ObjType::ZSET) {}
+    explicit Object(GZSet s, long long expire = -1) : value(std::move(s)), type(ObjType::ZSET), expiresAt(expire) {}
 };
 
 #endif //GUDB_OBJECT_H

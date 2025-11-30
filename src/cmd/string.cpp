@@ -2,23 +2,99 @@
 #include "../protocol/Encoder.h"
 #include <utility>
 #include <algorithm>
+#include <cctype>
+#include <chrono>
 
 namespace gudb::cmd {
     //SET   设置指定 key 的值
+    // SET key value [NX|XX] [EX seconds|PX milliseconds|EXAT timestamp|PXAT timestamp-milliseconds]
     std::string setCommand(std::vector<std::string> &args, Database &db) {
         if (args.size() < 3) {
             return protocol::Encoder::encodeError("ERR wrong number of arguments for 'set' command");
         }
 
         const std::string &key = args[1];
+        std::string value = args[2];
+        bool nx = false;
+        bool xx = false;
+        long long expireTime = -1;
 
-        // 检查类型是否匹配
+        for (size_t i = 3; i < args.size(); ++i) {
+            std::string opt = args[i];
+            std::transform(opt.begin(), opt.end(), opt.begin(), ::toupper);
+
+            if (opt == "NX") {
+                nx = true;
+            } else if (opt == "XX") {
+                xx = true;
+            } else if (opt == "EX" || opt == "PX") {
+                if (expireTime != -1) {
+                    return protocol::Encoder::encodeError("ERR syntax error");
+                }
+
+                if (i + 1 >= args.size()) {
+                    return protocol::Encoder::encodeError("ERR syntax error");
+                }
+
+                try {
+                    long long val = std::stoll(args[++i]);
+                    if (val <= 0) {
+                        return protocol::Encoder::encodeError("ERR invalid expire time in 'set' command");
+                    }
+
+                    if (opt == "EX") val *= 1000;
+
+                    auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::system_clock::now().time_since_epoch()
+                    ).count();
+
+                    expireTime = now + val;
+                } catch (...) {
+                    return protocol::Encoder::encodeError("ERR value is not an integer or out of range");
+                }
+            } else if (opt == "EXAT" || opt == "PXAT") {
+                if (expireTime != -1) {
+                    return protocol::Encoder::encodeError("ERR syntax error");
+                }
+
+                if (i + 1 >= args.size()) {
+                    return protocol::Encoder::encodeError("ERR syntax error");
+                }
+
+                try {
+                    long long val = std::stoll(args[++i]);
+                    if (val <= 0) {
+                        return protocol::Encoder::encodeError("ERR invalid expire time in 'set' command");
+                    }
+                    if (opt == "EXAT") val *= 1000;
+                    expireTime = val;
+                } catch (...) {
+                    return protocol::Encoder::encodeError("ERR value is not an integer or out of range");
+                }
+            } else {
+                return protocol::Encoder::encodeError("ERR syntax error");
+            }
+        }
+
+        if (nx && xx) {
+            return protocol::Encoder::encodeError("ERR syntax error");
+        }
+
         Object *obj = db.get(key);
         if (obj && obj->type != ObjType::STRING) {
             return protocol::Encoder::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
         }
 
-        db.set(key, Object(std::move(args[2])));
+        bool exists = (obj != nullptr);
+
+        if (nx && exists) {
+            return protocol::Encoder::encodeNull();
+        }
+        if (xx && !exists) {
+            return protocol::Encoder::encodeNull();
+        }
+
+        db.set(key, Object(std::move(value), expireTime));
 
         return protocol::Encoder::encodeSimpleString("OK");
     }
@@ -34,7 +110,7 @@ namespace gudb::cmd {
 
         // 2. 检查键是否存在
         const Object *obj = db.get(key);
-        if (!obj) {
+        if (obj == nullptr) {
             return protocol::Encoder::encodeNull();
         }
 
@@ -59,7 +135,7 @@ namespace gudb::cmd {
 
         // 2. 检查键是否存在
         const Object *obj = db.get(key);
-        if (!obj) {
+        if (obj == nullptr) {
             return protocol::Encoder::encodeBulkString("");
         }
 
@@ -73,7 +149,7 @@ namespace gudb::cmd {
 
             // 获取字符串值
             const auto &value = std::get<GString>(obj->value);
-            int len = static_cast<int>(value.length());
+            int len = static_cast<int>(value.size());
 
             // 处理索引
             l = std::max(l < 0 ? l + len : l, 0);
@@ -84,7 +160,7 @@ namespace gudb::cmd {
             }
 
             return protocol::Encoder::encodeBulkString(value.substr(l, r - l + 1));
-        } catch (const std::exception &e) {
+        } catch (...) {
             return protocol::Encoder::encodeError("ERR value is not an integer or out of range");
         }
     }
@@ -101,7 +177,7 @@ namespace gudb::cmd {
 
         // 2. 检查键是否存在
         Object *obj = db.get(key);
-        if (!obj) {
+        if (obj == nullptr) {
             db.set(key, Object(newValue));
             return protocol::Encoder::encodeNull();
         }
@@ -119,26 +195,169 @@ namespace gudb::cmd {
         return protocol::Encoder::encodeBulkString(res);
     }
 
-    // GETBIT	对 key 所储存的字符串值，获取指定偏移量上的位 ( bit )
     // MGET	获取所有(一个或多个)给定 key 的值
+    std::string mgetCommand(const std::vector<std::string> &args, Database &db) {
+        if (args.size() < 2) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'mget' command");
+        }
+
+        std::string res = "*" + std::to_string(args.size() - 1) + "\r\n";
+
+        for (size_t i = 1; i < args.size(); ++i) {
+            const std::string &key = args[i];
+            Object *obj = db.get(key);
+
+            if (obj == nullptr || obj->type != ObjType::STRING) {
+                res += protocol::Encoder::encodeNull();
+            } else {
+                res += protocol::Encoder::encodeBulkString(std::get<GString>(obj->value));
+            }
+        }
+        return res;
+    }
+
+    // GETBIT	对 key 所储存的字符串值，获取指定偏移量上的位 ( bit )
     // SETBIT	对 key 所储存的字符串值，设置或清除指定偏移量上的位(bit)
-    // SETEX	设置 key 的值为 value 同时将过期时间设为 seconds
-    // SETNX	只有在 key 不存在时设置 key 的值
+
+    // STRLEN key
+    std::string strlenCommand(const std::vector<std::string> &args, Database &db) {
+        if (args.size() != 2) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'strlen' command");
+        }
+
+        const std::string &key = args[1];
+        Object *obj = db.get(key);
+        if (obj == nullptr) return protocol::Encoder::encodeInteger(0);
+        if (obj->type != ObjType::STRING) {
+            return protocol::Encoder::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        }
+        return protocol::Encoder::encodeInteger(std::get<GString>(obj->value).size());
+    }
+
+    // MSET key value [key value ...]
+    std::string msetCommand(const std::vector<std::string> &args, Database &db) {
+        if (args.size() < 3 || args.size() % 2 == 0) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'mset' command");
+        }
+
+        for (size_t i = 1; i < args.size(); i += 2) {
+            db.set(args[i], Object(args[i + 1]));
+        }
+
+        return protocol::Encoder::encodeSimpleString("OK");
+    }
+
+    // SETEX key seconds value
+    std::string setexCommand(const std::vector<std::string> &args, Database &db) {
+        if (args.size() != 4) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'setex' command");
+        }
+
+        try {
+            long long seconds = std::stoll(args[2]);
+            if (seconds <= 0) {
+                return protocol::Encoder::encodeError("ERR invalid expire time in 'setex' command");
+            }
+
+            auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+
+            db.set(args[1], Object(args[3], now + seconds * 1000));
+        } catch (...) {
+            return protocol::Encoder::encodeError("ERR value is not an integer or out of range");
+        }
+        return protocol::Encoder::encodeSimpleString("OK");
+    }
+
+    // SETNX key value
+    std::string setnxCommand(const std::vector<std::string> &args, Database &db) {
+        if (args.size() != 3) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'setnx' command");
+        }
+
+        if (db.exists(args[1])) {
+            return protocol::Encoder::encodeInteger(0);
+        }
+
+        db.set(args[1], Object(args[2]));
+        return protocol::Encoder::encodeInteger(1);
+    }
+
+    // MSETNX key value [key value ...]
+    std::string msetnxCommand(const std::vector<std::string> &args, Database &db) {
+        if (args.size() < 3 || args.size() % 2 == 0) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'msetnx' command");
+        }
+        for (size_t i = 1; i < args.size(); i += 2) {
+            if (db.exists(args[i])) return protocol::Encoder::encodeInteger(0);
+        }
+        for (size_t i = 1; i < args.size(); i += 2) {
+            db.set(args[i], Object(args[i + 1]));
+        }
+        return protocol::Encoder::encodeInteger(1);
+    }
+
+    // PSETEX key milliseconds value
+    std::string psetexCommand(const std::vector<std::string> &args, Database &db) {
+        if (args.size() != 4) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'psetex' command");
+        }
+
+        try {
+            long long ms = std::stoll(args[2]);
+            if (ms <= 0) {
+                return protocol::Encoder::encodeError("ERR invalid expire time in 'psetex' command");
+            }
+
+            auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+
+            db.set(args[1], Object(args[3], now + ms));
+        } catch (...) {
+            return protocol::Encoder::encodeError("ERR value is not an integer or out of range");
+        }
+
+        return protocol::Encoder::encodeSimpleString("OK");
+    }
+
     // SETRANGE	从偏移量 offset 开始用 value 覆写给定 key 所储存的字符串值
-    // STRLEN	返回 key 所储存的字符串值的长度
-    // MSET	同时设置一个或多个 key-value 对
-    // MSETNX	同时设置一个或多个 key-value 对
-    // PSETEX	以毫秒为单位设置 key 的生存时间
     // INCR	将 key 中储存的数字值增一
     // INCRBY	将 key 所储存的值加上给定的增量值 ( increment )
     // INCRBYFLOAT	将 key 所储存的值加上给定的浮点增量值 ( increment )
     // DECR	将 key 中储存的数字值减一
     // DECRBY	将 key 所储存的值减去给定的减量值 ( decrement )
     // APPEND	将 value 追加到 key 原来的值的末尾
+    std::string appendCommand(const std::vector<std::string> &args, Database &db) {
+        if (args.size() != 3) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'append' command");
+        }
+        const std::string &key = args[1], &value = args[2];
+
+        Object *obj = db.get(key);
+        if (obj && obj->type != ObjType::STRING) {
+            return protocol::Encoder::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        }
+
+        if (obj != nullptr) {
+            std::get<GString>(obj->value).append(value);
+        } else {
+            db.set(key, Object(value));
+        }
+
+        return protocol::Encoder::encodeInteger(value.size());
+    }
 
     // 自注册
     static AutoRegister reg_set("SET", setCommand);
     static AutoRegister reg_get("GET", getCommand);
     static AutoRegister reg_getrange("GETRANGE", getrangeCommand);
     static AutoRegister reg_getset("GETSET", getsetCommand);
+    static AutoRegister reg_mget("MGET", mgetCommand);
+    static AutoRegister reg_strlen("STRLEN", strlenCommand);
+    static AutoRegister reg_mset("MSET", msetCommand);
+    static AutoRegister reg_setex("SETEX", setexCommand);
+    static AutoRegister reg_setnx("SETNX", setnxCommand);
+    static AutoRegister reg_msetnx("MSETNX", msetnxCommand);
+    static AutoRegister reg_psetex("PSETEX", psetexCommand);
+    static AutoRegister reg_append("APPEND", appendCommand);
 } // namespace gudb::cmd
