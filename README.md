@@ -34,6 +34,12 @@ cmake --build build -- -j$(nproc)
 
 > **调试模式**: 如需调试，可将配置命令改为 `cmake -B build -DCMAKE_BUILD_TYPE=Debug`。
 
+> **静态编译**: 需要静态链接可执行文件，可启用 `ENABLE_STATIC` 选项：
+> ```bash
+> cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_STATIC=ON
+> ```
+> 可能需要安装对应的静态库。
+
 #### 2. 运行服务器
 
 编译完成后，可执行文件位于 `build/src/` 目录下：
@@ -83,7 +89,7 @@ OK
 
 目前已实现的命令如下：
 
-- **基础命令**: `PING`, `ECHO`, `TIME`
+- **基础命令**: `PING`, `ECHO`, `TIME`, `FLUSHDB`
 - **字符串 (String)**: `SET`, `GET`, `GETRANGE`, `GETSET`, `MGET`, `MSET`, `SETNX`, `MSETNX`, `STRLEN`, `APPEND`,
   `SETEX`, `PSETEX`, `INCR`, `INCRBY`, `DECR`, `DECRBY`
 - **键操作 (Key)**: `DEL`, `EXISTS`, `EXPIRE`, `EXPIREAT`, `PEXPIRE`, `PEXPIREAT`, `PERSIST`, `TTL`, `PTTL`, `RENAME`,

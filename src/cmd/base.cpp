@@ -30,6 +30,15 @@ namespace gudb::cmd {
         });
     }
 
+    // FLUSHDB
+    std::string flushDBCommand([[maybe_unused]] const std::vector<std::string> &args, Database &db) {
+        if (args.size() != 1) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'flushdb' command");
+        }
+        db.clear();
+        return protocol::Encoder::encodeSimpleString("OK");
+    }
+
     //自注册
     static AutoRegister reg_ping("PING", pingCommand);
     static AutoRegister reg_echo("ECHO", echoCommand);
