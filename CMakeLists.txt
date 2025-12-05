@@ -3,6 +3,13 @@ project(gudb-server)
 
 set(CMAKE_CXX_STANDARD 20)
 
+# 静态编译选项
+option(ENABLE_STATIC "Enable static compilation" OFF)
+if (ENABLE_STATIC)
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
+    message(STATUS "Static compilation enabled")
+endif ()
+
 # 默认构建类型为 Release
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)

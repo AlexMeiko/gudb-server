@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <cerrno>
 #include <memory>
+#include <vector>
+#include <string>
 
 namespace gudb::net {
     Connection::Connection(int fd, Database *db) : fd_(fd), db_(db) {}

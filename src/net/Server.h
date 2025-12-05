@@ -3,6 +3,7 @@
 #include "Connection.h"
 #include <unordered_map>
 #include <memory>
+#include <string>
 
 namespace gudb::net {
     class Server {

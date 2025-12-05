@@ -2,6 +2,7 @@
 #include "../core/Buffer.h"
 #include "../protocol/Parser.h"
 #include "../db/Database.h"
+#include <string>
 
 namespace gudb::net {
     class Connection {

@@ -1,6 +1,7 @@
 #include "Encoder.h"
 #include <string>
 #include <cstdint>
+#include <vector>
 
 #if __cpp_lib_format >= 202110L
 #include <format>

@@ -1,6 +1,11 @@
 #include "Registry.h"
+#include "utils.h"
 #include "../protocol/Encoder.h"
 #include <utility>
+#include <charconv>
+#include <vector>
+#include <string>
+#include <cstdint>
 
 namespace gudb::cmd {
     std::string hsetCommand(std::vector<std::string> &args, Database &db) {
@@ -58,7 +63,44 @@ namespace gudb::cmd {
         return protocol::Encoder::encodeBulkString(it->second);
     }
 
+    // HINCRBY key field increment - 为哈希表 key 中的字段 field 的值加上增量 increment
+    std::string hincrbyCommand(std::vector<std::string> &args, Database &db) {
+        if (args.size() != 4) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'hincrby' command");
+        }
+
+        const std::string &key = args[1];
+        const std::string &field = args[2];
+
+        // 解析增量
+        int64_t delta;
+        auto [ptr, ec] = std::from_chars(args[3].data(), args[3].data() + args[3].size(), delta);
+        if (ec != std::errc{} || ptr != args[3].data() + args[3].size()) {
+            return protocol::Encoder::encodeError("ERR value is not an integer or out of range");
+        }
+
+        Object *obj = db.get(key);
+
+        // 如果key 不存在，则创建
+        if (!obj) {
+            db.set(key, Object(GHash{}));
+            obj = db.get(key);
+        } else if (obj->type != ObjType::HASH) {
+            return protocol::Encoder::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        }
+
+        auto &hash = std::get<GHash>(obj->value);
+
+        // 若字段不存在，初始化为"0"
+        if (hash.find(field) == hash.end()) {
+            hash[field] = "0";
+        }
+
+        return doIncrLike(hash[field], delta);
+    }
+
     // 自注册
     static AutoRegister reg_hset("HSET", hsetCommand);
     static AutoRegister reg_hget("HGET", hgetCommand);
+    static AutoRegister reg_hincrby("HINCRBY", hincrbyCommand);
 } // namespace gudb::cmd

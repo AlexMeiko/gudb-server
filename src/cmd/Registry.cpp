@@ -1,4 +1,6 @@
 #include "Registry.h"
+#include <utility>
+#include <string>
 
 namespace gudb::cmd {
     Registry &Registry::instance() {

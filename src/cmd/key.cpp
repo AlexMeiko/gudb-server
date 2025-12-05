@@ -2,6 +2,9 @@
 #include "../protocol/Encoder.h"
 #include <algorithm>
 #include <chrono>
+#include <vector>
+#include <string>
+#include <charconv>
 
 namespace gudb::cmd {
     // DEL 用于删除 key
@@ -39,20 +42,21 @@ namespace gudb::cmd {
             return protocol::Encoder::encodeInteger(0);
         }
 
-        try {
-            long long delta = std::stoll(args[2]);
-
-            // 获取当前时间戳（毫秒）
-            auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::system_clock::now().time_since_epoch()
-            ).count();
-
-            db.setExpire(key, now + delta);
-
-            return protocol::Encoder::encodeInteger(1);
-        } catch (const std::exception &e) {
+        const std::string &deltaStr = args[2];
+        long long delta = 0;
+        auto [ptr, ec] = std::from_chars(deltaStr.data(), deltaStr.data() + deltaStr.size(), delta);
+        if (ec != std::errc() || ptr != deltaStr.data() + deltaStr.size()) {
             return protocol::Encoder::encodeError("ERR value is not an integer or out of range");
         }
+
+        // 获取当前时间戳（毫秒）
+        auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()
+        ).count();
+
+        db.setExpire(key, now + delta);
+
+        return protocol::Encoder::encodeInteger(1);
     }
 
     // PEXPIREAT	设置 key 过期时间的时间戳(unix timestamp)，以毫秒计
@@ -68,16 +72,16 @@ namespace gudb::cmd {
             return protocol::Encoder::encodeInteger(0);
         }
 
-        try {
-            //毫秒时间戳
-            long long timestamp = std::stoll(args[2]);
-
-            db.setExpire(key, timestamp);
-
-            return protocol::Encoder::encodeInteger(1);
-        } catch (const std::exception &e) {
+        const std::string &timestampStr = args[2];
+        long long timestamp = 0;
+        auto [ptr, ec] = std::from_chars(timestampStr.data(), timestampStr.data() + timestampStr.size(), timestamp);
+        if (ec != std::errc() || ptr != timestampStr.data() + timestampStr.size()) {
             return protocol::Encoder::encodeError("ERR value is not an integer or out of range");
         }
+
+        db.setExpire(key, timestamp);
+
+        return protocol::Encoder::encodeInteger(1);
     }
 
 
@@ -157,9 +161,9 @@ namespace gudb::cmd {
     }
 
     // RANDOMKEY	从当前数据库中随机返回一个 key
-    std::string randomkeyCommand(const std::vector<std::string> &args, Database &db) {
-
-    }
+    // std::string randomkeyCommand(const std::vector<std::string> &args, Database &db) {
+    //
+    // }
 
     // RENAME	修改 key 的名称
     std::string renameCommand(const std::vector<std::string> &args, Database &db) {

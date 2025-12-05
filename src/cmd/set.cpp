@@ -1,6 +1,8 @@
 #include "Registry.h"
 #include "../protocol/Encoder.h"
 #include <utility>
+#include <vector>
+#include <string>
 
 namespace gudb::cmd {
     std::string saddCommand(std::vector<std::string> &args, Database &db) {

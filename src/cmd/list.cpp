@@ -1,6 +1,8 @@
 #include "Registry.h"
 #include "../protocol/Encoder.h"
 #include <utility>
+#include <vector>
+#include <string>
 
 namespace gudb::cmd {
     std::string lpushCommand(std::vector<std::string> &args, Database &db) {
@@ -44,7 +46,7 @@ namespace gudb::cmd {
             return protocol::Encoder::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
         }
 
-        auto &list = std::get<GList>(db.get(key)->value);
+        auto &list = std::get<GList>(slot->value);
 
         if (list.empty()) {
             return protocol::Encoder::encodeNull();

@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <charconv>
 
 namespace gudb::protocol {
     // BufferReader 辅助类，用于不修改原 Buffer 的情况下进行预读取
@@ -68,10 +69,9 @@ namespace gudb::protocol {
             return ParseResult::ERROR;
         }
 
-        int count;
-        try {
-            count = std::stoi(line.substr(1));
-        } catch (...) {
+        int count = 0;
+        auto [ptr, ec] = std::from_chars(line.data() + 1, line.data() + line.size(), count);
+        if (ec != std::errc() || ptr != line.data() + line.size()) {
             return ParseResult::ERROR;
         }
 
@@ -103,10 +103,9 @@ namespace gudb::protocol {
             return ParseResult::ERROR;
         }
 
-        int len;
-        try {
-            len = std::stoi(line.substr(1));
-        } catch (...) {
+        int len = 0;
+        auto [ptr, ec] = std::from_chars(line.data() + 1, line.data() + line.size(), len);
+        if (ec != std::errc() || ptr != line.data() + line.size()) {
             return ParseResult::ERROR;
         }
 

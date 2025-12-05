@@ -1,6 +1,8 @@
 #include "Registry.h"
 #include "../protocol/Encoder.h"
 #include <chrono>
+#include <vector>
+#include <string>
 
 namespace gudb::cmd {
     // PING

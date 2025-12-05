@@ -84,12 +84,13 @@ OK
 目前已实现的命令如下：
 
 - **基础命令**: `PING`, `ECHO`, `TIME`
-- **字符串 (String)**: `SET`, `GET`, `GETRANGE`, `GETSET`
+- **字符串 (String)**: `SET`, `GET`, `GETRANGE`, `GETSET`, `MGET`, `MSET`, `SETNX`, `MSETNX`, `STRLEN`, `APPEND`,
+  `SETEX`, `PSETEX`, `INCR`, `INCRBY`, `DECR`, `DECRBY`
 - **键操作 (Key)**: `DEL`, `EXISTS`, `EXPIRE`, `EXPIREAT`, `PEXPIRE`, `PEXPIREAT`, `PERSIST`, `TTL`, `PTTL`, `RENAME`,
   `RENAMENX`, `TYPE`
 - **列表 (List)**: `LPUSH`, `LPOP`
 - **集合 (Set)**: `SADD`, `SMEMBERS`
-- **哈希 (Hash)**: `HSET`, `HGET`
+- **哈希 (Hash)**: `HSET`, `HGET`, `HINCRBY`
 
 > ⚠️ **注意**: 部分 Redis 指令（如 `KEYS`, `RANDOMKEY`, `SETRANGE` 等）尚未完全实现或仅作为占位符。
 
@@ -161,11 +162,24 @@ namespace gudb::cmd {
 
 ## 📌 待办事项 / 已知问题
 
-- [ ] **命令完善**: 补充 `MGET`, `MSET`, `INCR`, `ZADD` 等常用命令。
+- [ ] **命令完善**: 补充 `ZADD`, `LREM`, `SREM` 等常用命令。
 - [ ] **数据结构**: 完善跳表 (SkipList) 等底层数据结构。
 - [ ] **持久化**: 支持数据持久化到硬盘 (RDB/AOF)。
 - [ ] **配置增强**: 支持命令行参数 (如 `-p <port>`) 及配置文件。
 - [ ] **多系统支持**: 目前强依赖 Linux `epoll`，暂不支持 Windows 和 macOS 原生构建。
+
+---
+
+## 📏 开发规范
+
+以下是目前项目所使用的规范，如果更好的提议，请务必让我知道:
+
+### 文件命名
+
+- **类文件**：使用 **PascalCase**（大驼峰）。文件名应与类名完全一致。
+    - 例：`Command.h`, `Registry.cpp`
+- **非类文件/功能模块**：使用 **snake_case**（全小写）。适用于包含一组函数或无特定类的实现文件。
+    - 例：`string.cpp`, `utils.h`, `main.cpp`
 
 ---
 

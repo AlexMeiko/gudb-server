@@ -2,6 +2,7 @@
 #include <chrono>
 #include <iostream>
 #include <iomanip>
+#include <string>
 
 namespace gudb::core {
     Logger::Logger() {
