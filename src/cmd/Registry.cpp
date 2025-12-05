@@ -1,6 +1,8 @@
 #include "Registry.h"
-#include <utility>
+#include <algorithm>
+#include <cctype>
 #include <string>
+#include <utility>
 
 namespace gudb::cmd {
     Registry &Registry::instance() {
@@ -9,14 +11,23 @@ namespace gudb::cmd {
     }
 
     void Registry::registerCommand(const std::string &name, CommandFunc func) {
-        commands_[name] = std::move(func);
+        std::string upper;
+        upper.reserve(name.size());
+        for (unsigned char c: name) {
+            upper.push_back(static_cast<char>(std::toupper(c)));
+        }
+
+        commands_[std::move(upper)] = std::move(func);
     }
 
     Registry::CommandFunc Registry::getCommand(const std::string &name) {
-        auto it = commands_.find(name);
-        if (it != commands_.end()) {
-            return it->second;
+        std::string upper;
+        upper.reserve(name.size());
+        for (unsigned char c: name) {
+            upper.push_back(static_cast<char>(std::toupper(c)));
         }
-        return nullptr;
+
+        auto it = commands_.find(upper);
+        return it != commands_.end() ? it->second : nullptr;
     }
 } // namespace gudb::cmd
