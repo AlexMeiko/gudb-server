@@ -9,6 +9,7 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <netinet/tcp.h>
 
 namespace gudb::net {
     Server::Server(Database *db) : epollFd_(-1), listenFd_(-1), db_(db) {
@@ -118,6 +119,10 @@ namespace gudb::net {
                 continue;
             }
 
+            // 禁用 Nagle
+            int flag = 1;
+            setsockopt(clientFd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+
             epoll_event ev{};
 
             // 监听读事件（ET），EPOLLRDHUP 用于检测对端半关闭（避免漏处理断连）
@@ -125,7 +130,7 @@ namespace gudb::net {
             ev.data.fd = clientFd;
             epoll_ctl(epollFd_, EPOLL_CTL_ADD, clientFd, &ev);
 
-            connections_[clientFd] = std::make_unique<Connection>(clientFd, db_);
+            connections_[clientFd] = std::make_unique<Connection>(clientFd, db_, epollFd_);
             LOG_INFO("New connection from " + std::string(inet_ntoa(clientAddr.sin_addr)) +
                      ":" + std::to_string(ntohs(clientAddr.sin_port)));
         }

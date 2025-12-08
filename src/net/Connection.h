@@ -7,7 +7,7 @@
 namespace gudb::net {
     class Connection {
     public:
-        Connection(int fd, Database *db);
+        Connection(int fd, Database *db, int epollFd);
 
         ~Connection();
 
@@ -26,11 +26,12 @@ namespace gudb::net {
         int fd() const { return fd_; }
 
     private:
-        int fd_;
+        int fd_, epollFd_;
         core::Buffer readBuf_;
         core::Buffer writeBuf_;
         protocol::Parser parser_;
         Database *db_;
+        bool listeningEpollOut_ = false;
 
         // 处理接收到的命令，从读缓冲区解析并执行命令
         void processCommands();

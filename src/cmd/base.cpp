@@ -31,7 +31,7 @@ namespace gudb::cmd {
     }
 
     // FLUSHDB
-    std::string flushDBCommand([[maybe_unused]] const std::vector<std::string> &args, Database &db) {
+    std::string flushDBCommand(const std::vector<std::string> &args, Database &db) {
         if (args.size() != 1) {
             return protocol::Encoder::encodeError("ERR wrong number of arguments for 'flushdb' command");
         }

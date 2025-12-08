@@ -3,12 +3,13 @@
 #include "../protocol/Encoder.h"
 #include <unistd.h>
 #include <cerrno>
+#include <sys/epoll.h>
 #include <memory>
 #include <vector>
 #include <string>
 
 namespace gudb::net {
-    Connection::Connection(int fd, Database *db) : fd_(fd), db_(db) {}
+    Connection::Connection(int fd, Database *db, int epollFd) : fd_(fd), epollFd_(epollFd), db_(db) {}
 
     Connection::~Connection() {
         close(fd_);
@@ -78,12 +79,47 @@ namespace gudb::net {
     }
 
     // 发送回复给客户端
-    // TODO: 使用写缓冲区处理 EAGAIN 情况
     void Connection::sendReply(const std::string &reply) {
-        write(fd_, reply.c_str(), reply.size());
+        writeBuf_.append(reply.c_str(), reply.size());
+        this->handleWrite();
     }
 
     // 处理写事件（ET 模式）
-    // TODO: 完善写事件处理，使用写缓冲区
-    void Connection::handleWrite() {}
+    // 在 EPOLLOUT 触发时，将写缓冲区写出
+    void Connection::handleWrite() {
+        while (writeBuf_.readableBytes() > 0) {
+            ssize_t n = write(fd_, writeBuf_.peek(), writeBuf_.readableBytes());
+            if (n > 0) {
+                writeBuf_.retrieve(static_cast<size_t>(n));
+                continue;
+            }
+
+            if (n == -1) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    if (!listeningEpollOut_) {
+                        epoll_event ev{};
+                        ev.events = EPOLLIN | EPOLLET | EPOLLRDHUP | EPOLLOUT;
+                        ev.data.fd = fd_;
+                        epoll_ctl(epollFd_, EPOLL_CTL_MOD, fd_, &ev);
+                        listeningEpollOut_ = true;
+                    }
+                    return;
+                } else {
+                    close(fd_);
+                    return;
+                }
+            }
+
+            close(fd_);
+            return;
+        }
+
+        if (listeningEpollOut_) {
+            epoll_event ev{};
+            ev.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
+            ev.data.fd = fd_;
+            epoll_ctl(epollFd_, EPOLL_CTL_MOD, fd_, &ev);
+            listeningEpollOut_ = false;
+        }
+    }
 } // namespace gudb::net
