@@ -76,12 +76,15 @@ namespace gudb::net {
             // 发送回复给客户端
             sendReply(reply);
         }
+
+        if (writeBuf_.readableBytes() > 0) {
+            handleWrite();
+        }
     }
 
     // 发送回复给客户端
     void Connection::sendReply(const std::string &reply) {
         writeBuf_.append(reply.c_str(), reply.size());
-        this->handleWrite();
     }
 
     // 处理写事件（ET 模式）
