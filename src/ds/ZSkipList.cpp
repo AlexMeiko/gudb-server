@@ -144,15 +144,56 @@ bool ZSkipList::eraseByValue(const std::string &value) {
     return found;
 }
 
+int ZSkipList::getRange(int l, int r, std::vector<std::string> &result) {
+    result.clear();
+    l = std::max(0, l), r = std::min(r, size_ - 1);
+    if (l > r || headers_.empty() || size_ == 0) {
+        return 0;
+    }
+
+    // 定位到 l 的前驱，O(log N)
+    ZSkipListNode *p = headers_.back().get();
+    int cnt = 0; // 当前节点的底层索引
+    while (p) {
+        while (p->next_ && cnt + p->span_ <= l) {
+            cnt += p->span_;
+            p = p->next_.get();
+        }
+        if (p->down_) {
+            p = p->down_;
+        } else {
+            break;
+        }
+    }
+
+    for (p = p ? p->next_.get() : nullptr; l <= r && p; ++l, p = p->next_.get()) {
+        result.push_back(p->value_);
+    }
+
+    return static_cast<int>(result.size());
+}
+
+
+int ZSkipList::getRangeByLex(const std::string &minValue, const std::string &maxValue,
+                             std::vector<std::string> &result) {
+    result.clear();
+    ZSkipListNode *p = findPredecessor(0.0, minValue);
+
+    for (p = p ? p->next_.get() : nullptr; p && p->value_ <= maxValue; p = p->next_.get()) {
+        result.push_back(p->value_);
+    }
+
+    return static_cast<int>(result.size());
+}
 
 int ZSkipList::getRangeByScore(double minScore, double maxScore, std::vector<std::string> &result) {
     result.clear();
     ZSkipListNode *p = findPredecessor(minScore);
-    p = p ? p->next_.get() : nullptr;
-    while (p && p->score_ <= maxScore) {
+
+    for (p = p ? p->next_.get() : nullptr; p && p->score_ <= maxScore; p = p->next_.get()) {
         result.push_back(p->value_);
-        p = p->next_.get();
     }
+
     return static_cast<int>(result.size());
 }
 

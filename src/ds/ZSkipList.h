@@ -65,19 +65,29 @@ public:
     ~ZSkipList();
 
     /**
-     * @brief 插入或更新成员
-     * @param score 新分数
-     * @param value 成员值
-     * @return true 表示新插入；false 表示已存在且分数未变或被更新
-     */
-    bool insertOrUpdate(double score, const std::string &value);
-
-    /**
      * @brief 按成员值删除
      * @param value 成员值
      * @return true 表示找到并删除
      */
     bool eraseByValue(const std::string &value);
+
+    /**
+     * @brief 按索引闭区间获取成员列表
+     * @param l 最小索引（包含，0-based）
+     * @param r 最大索引（包含，0-based）
+     * @param result 输出：按分数升序的成员值列表
+     * @return 返回写入的元素个数
+     */
+    int getRange(int l, int r, std::vector<std::string> &result);
+
+    /**
+     * @brief 按字典序闭区间获取成员列表,需保证Score都一致且大于0
+     * @param minValue 最小成员值（包含）
+     * @param maxValue 最大成员值（包含）
+     * @param result 输出：按字典序升序的成员值列表
+     * @return 返回写入的元素个数
+     */
+    int getRangeByLex(const std::string &minValue, const std::string &maxValue, std::vector<std::string> &result);
 
     /**
      * @brief 按分数闭区间获取成员列表
@@ -87,6 +97,14 @@ public:
      * @return 返回写入的元素个数
      */
     int getRangeByScore(double minScore, double maxScore, std::vector<std::string> &result);
+
+    /**
+     * @brief 插入或更新成员
+     * @param score 新分数
+     * @param value 成员值
+     * @return true 表示新插入；false 表示已存在且分数未变或被更新
+     */
+    bool insertOrUpdate(double score, const std::string &value);
 
     /**
      * @brief 当前元素个数
