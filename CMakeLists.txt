@@ -26,3 +26,6 @@ include(GNUInstallDirs)
 
 # 添加源文件目录
 add_subdirectory(src)
+
+# 单元测试
+add_subdirectory(tests)

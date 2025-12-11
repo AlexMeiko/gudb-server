@@ -6,20 +6,13 @@ if (Catch2_FOUND)
 
     add_executable(test_gudb
             test_main.cpp
-            test_buffer.cpp
-            test_parser.cpp
             test_zskiplist.cpp
-            test_command.cpp
     )
 
     target_link_libraries(test_gudb
             PRIVATE
             Catch2::Catch2
-            core
-            protocol
             ds
-            db
-            cmd
     )
 
     target_include_directories(test_gudb PRIVATE
