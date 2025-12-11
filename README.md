@@ -1,11 +1,11 @@
 # gudb-server
 
-轻量级 Redis 风格的内存键值数据库（C++ 实现）。
+轻量级 Redis 风格的内存键值数据库（C++20 实现），兼容 RESP 与基础 redis-cli 命令。
 
-- **支持类型**：String、List、Set、Hash、ZSet（部分实现）
-- **协议**：Redis RESP（兼容 redis-cli 基本命令交互）
-- **网络**：基于 epoll 的非阻塞 IO 实现（Linux）
-- **构建工具**：CMake（C++20）, 支持 `make` / Ninja
+- **支持类型**：String、List、Set、Hash、ZSet（基础命令已实现）
+- **协议**：Redis RESP（支持复用 redis-cli 交互）
+- **网络**：基于 epoll 的非阻塞 IO（仅 Linux）
+- **构建工具**：CMake
 
 ---
 
@@ -20,59 +20,60 @@
 
 ### 🛠️ 构建与安装
 
-推荐使用 out-of-source 构建方式。
-
-#### 1. 编译项目
+推荐使用 out-of-source 构建：
 
 ```bash
-# 创建并配置构建目录 (默认 Release)
+# 1) 生成构建目录（默认 Release）
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 
-# 开始编译
+# 2) 开始编译
 cmake --build build -- -j$(nproc)
 ```
 
-> **调试模式**: 如需调试，可将配置命令改为 `cmake -B build -DCMAKE_BUILD_TYPE=Debug`。
+> 调试模式：`cmake -B build -DCMAKE_BUILD_TYPE=Debug`  
+> 静态编译：`cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_STATIC=ON`（可能需要对应的静态库）
 
-> **静态编译**: 需要静态链接可执行文件，可启用 `ENABLE_STATIC` 选项：
-> ```bash
-> cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_STATIC=ON
-> ```
-> 可能需要安装对应的静态库。
-
-#### 2. 运行服务器
-
-编译完成后，可执行文件位于 `build/src/` 目录下：
+#### 运行服务
 
 ```bash
 ./build/src/gudb-server
 # 默认监听端口: 6378
 ```
 
-#### 3. 安装 (可选)
-
-将 `gudb-server` 安装到系统路径（默认 `/usr/local/bin`）：
+#### 安装（可选）
 
 ```bash
 sudo cmake --install build
 ```
 
-安装完成后，可以直接在终端运行 `gudb-server`。
+安装后可直接在终端运行 `gudb-server`。
+
+---
+
+## 🧪 测试
+
+项目附带 ZSkipList 的单元测试，依赖 Catch2：
+
+```bash
+# 需要先安装 Catch2（例如 Debian/Ubuntu: sudo apt-get install catch2）
+cmake -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build --target test_gudb
+ctest --test-dir build
+```
+
+未安装 Catch2 时会跳过测试构建。
 
 ---
 
 ## 💻 使用说明
 
-你可以使用标准的 `redis-cli` 或 `telnet` / `nc` 进行连接测试。
-
-### 使用 redis-cli (推荐)
+推荐直接使用标准的 `redis-cli` 进行连接：
 
 ```bash
-# 连接到 6378 端口
 redis-cli -p 6378
 ```
 
-示例交互：
+交互示例：
 
 ```bash
 127.0.0.1:6378> SET mykey "Hello World"
@@ -83,26 +84,27 @@ OK
 (integer) -1
 ```
 
+也可以使用`telnet` / `nc` 进行连接测试。
+
 ---
 
-## 🔧 支持命令
+## ⚙️ 支持命令
 
-目前已实现的命令如下：
-
-- **基础命令**: `PING`, `ECHO`, `TIME`, `FLUSHDB`
-- **字符串 (String)**: `SET`, `GET`, `GETRANGE`, `GETSET`, `MGET`, `MSET`, `SETNX`, `MSETNX`, `STRLEN`, `APPEND`,
-  `SETEX`, `PSETEX`, `INCR`, `INCRBY`, `DECR`, `DECRBY`
-- **键操作 (Key)**: `DEL`, `EXISTS`, `EXPIRE`, `EXPIREAT`, `PEXPIRE`, `PEXPIREAT`, `PERSIST`, `TTL`, `PTTL`, `RENAME`,
+- 基础：`PING`, `ECHO`, `TIME`, `FLUSHDB`
+- 字符串 (String)：`SET`, `GET`, `GETRANGE`, `GETSET`, `MGET`, `MSET`, `SETNX`, `MSETNX`, `STRLEN`, `APPEND`, `SETEX`,
+  `PSETEX`, `INCR`, `INCRBY`, `DECR`, `DECRBY`
+- 键 (Key)：`DEL`, `EXISTS`, `EXPIRE`, `EXPIREAT`, `PEXPIRE`, `PEXPIREAT`, `PERSIST`, `TTL`, `PTTL`, `RENAME`,
   `RENAMENX`, `TYPE`
-- **列表 (List)**: `LPUSH`, `LPOP`
-- **集合 (Set)**: `SADD`, `SMEMBERS`
-- **哈希 (Hash)**: `HSET`, `HGET`, `HINCRBY`
+- 列表 (List)：`LPUSH`, `LPOP`
+- 集合 (Set)：`SADD`, `SMEMBERS`
+- 哈希 (Hash)：`HSET`, `HGET`, `HINCRBY`
+- 有序集合 (ZSet)：`ZADD`, `ZRANGE`, `ZRANGEBYSCORE`
 
-> ⚠️ **注意**: 部分 Redis 指令（如 `KEYS`, `RANDOMKEY`, `SETRANGE` 等）尚未完全实现或仅作为占位符。
+> ⚠️ 部分 Redis 命令（如 `KEYS`, `RANDOMKEY`, `SETRANGE` 等）尚未实现或仅保留占位。
 
 ---
 
-## 📦 项目结构
+## 🗂 项目结构
 
 ```text
 src/
@@ -119,11 +121,12 @@ tests/                      # 单元测试
 
 ### 核心模块
 
-- **db/Object.h**: 统一的数据对象封装，使用 `std::variant` 存储不同类型的值。
-- **db/Database.h**: 核心数据库实现，包含 `std::unordered_map` 存储与过期键管理。
-- **protocol/Parser.h**: RESP 协议解析器，处理客户端请求。
-- **cmd/Registry.h**: 命令注册中心，利用静态全局变量实现命令的自动注册。
-- **net/Server.cpp**: 基于 `epoll` 的事件循环与连接管理。
+- `db/Object.h`：统一的数据对象封装，使用 `std::variant` 持有不同类型的值。
+- `db/Database.h`：内存数据库核心实现，包含键空间存储与过期管理。
+- `ds/ZSkipList.h`：有序集合的跳表实现，支持按 score/lex 范围查询。
+- `protocol/Parser.h`：RESP 协议解析器，处理客户端请求。
+- `cmd/Registry.h`：命令注册中心，利用静态全局变量实现命令的自动注册。
+- `net/Server.cpp`：基于 `epoll` 的事件循环与连接管理。
 
 ---
 
@@ -131,7 +134,7 @@ tests/                      # 单元测试
 
 ### 添加新命令
 
-在 `src/cmd/` 目录下新建 `.cpp` 文件（例如 `hello.cpp`），并利用 `AutoRegister` 进行注册：
+在 `src/cmd/` 目录下新增 `.cpp` 文件（如 `hello.cpp`），并利用 `AutoRegister` 完成注册：
 
 ```cpp
 #include "Registry.h"
@@ -157,22 +160,22 @@ namespace gudb::cmd {
 
 ### 过期策略
 
-- 采用惰性删除：`db.get()` 和 `db.exists()` 会检查键是否过期并在需要时删除。
-- 存储时间为毫秒级时间戳（`expiresAt`, -1 表示永不过期）。
+- 采用惰性删除：`db.get()` / `db.exists()` 等在访问时检查过期并清理。
+- 过期时间以毫秒时间戳存储，`expiresAt = -1` 表示永不过期。
 
 ### 性能提示
 
-- 使用 `swap` 可以在 O(1) 时间复杂度下替换字符串值，若使用了请注明。**注意：未来可能因其修改源数据的副作用而弃用。**
+- 可以在适当场景使用 `swap` 避免拷贝（若修改了来源数据，请在注释中说明）。
 
 ---
 
 ## 📌 待办事项 / 已知问题
 
-- [ ] **命令完善**: 补充 `ZADD`, `LREM`, `SREM` 等常用命令。
-- [ ] **数据结构**: 完善跳表 (SkipList) 等底层数据结构。
-- [ ] **持久化**: 支持数据持久化到硬盘 (RDB/AOF)。
-- [ ] **配置增强**: 支持命令行参数 (如 `-p <port>`) 及配置文件。
-- [ ] **多系统支持**: 目前强依赖 Linux `epoll`，暂不支持 Windows 和 macOS 原生构建。
+- [x] **数据结构**: 完善跳表 (SkipList) 。
+- [ ] **命令补充**：`LRANGE`、`LREM`、`SREM` 以及更多 ZSet 命令（`ZREM`、`ZCARD`、`ZSCORE`、`ZRANGEBYLEX` 等）。
+- [ ] **持久化**：支持 RDB/AOF 等落盘方案。
+- [ ] **配置增强**：支持命令行参数（如 `-p <port>`）与配置文件。
+- [ ] **多系统支持**：当前依赖 Linux `epoll`，暂不支持 Windows/macOS 原生构建。
 
 ---
 
@@ -182,24 +185,23 @@ namespace gudb::cmd {
 
 ### 文件命名
 
-- **类文件**：使用 **PascalCase**（大驼峰）。文件名应与类名完全一致。
-    - 例：`Command.h`, `Registry.cpp`
-- **非类文件/功能模块**：使用 **snake_case**（全小写）。适用于包含一组函数或无特定类的实现文件。
-    - 例：`string.cpp`, `utils.h`, `main.cpp`
+- 类文件：使用 PascalCase（大驼峰），文件名与类名保持一致，例如 `Command.h`, `Registry.cpp`。
+- 非类文件/功能模块：使用 snake_case（全小写），适用于包含一组函数或无特定类的实现文件，例如 `string.cpp`, `utils.h`,
+  `main.cpp`。
+
+如有更好的建议，欢迎提出。
 
 ---
 
 ## 🤝 贡献
 
-欢迎提交 PR、提出 issue 或贡献代码！请遵循以下流程：
-
 1. Fork 仓库
 2. 创建分支：`feature/your-feature` 或 `fix/issue-number`
 3. 编写代码并补充或更新测试
-4. 提交 PR 并描述变更内容与理由
+4. 提交 PR，并描述变更内容与理由
 
 ---
 
-## 📜 许可证
+## 📜 许可
 
-本项目遵循 Apache 2.0 许可证（或参考根目录 LICENSE 文件）。
+本项目遵循 Apache 2.0 许可证（详见根目录 `LICENSE` 文件）。
