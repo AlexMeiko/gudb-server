@@ -104,6 +104,24 @@ ZSkipList::ZSkipList() : level_(1), size_(0) {
 
 ZSkipList::~ZSkipList() = default;
 
+int ZSkipList::rankByScore(double score, bool inclusive) const {
+    ZSkipListNode *p = headers_.empty() ? nullptr : headers_.back().get();
+    int cnt = 0;
+    while (p) {
+        while (p->next_ && (inclusive ? p->next_->score_ <= score : p->next_->score_ < score)) {
+            cnt += p->span_;
+            p = p->next_.get();
+        }
+
+        if (p->down_) {
+            p = p->down_;
+        } else {
+            break;
+        }
+    }
+    return cnt;
+}
+
 bool ZSkipList::eraseByValue(const std::string &value) {
     auto it = dict_.find(value);
     if (it == dict_.end()) {
@@ -195,6 +213,14 @@ int ZSkipList::getRangeByScore(double minScore, double maxScore, std::vector<std
     }
 
     return static_cast<int>(result.size());
+}
+
+int ZSkipList::countByScore(double minScore, double maxScore) const {
+    if (minScore > maxScore || size_ == 0) {
+        return 0;
+    }
+
+    return rankByScore(maxScore, true) - rankByScore(minScore, false);
 }
 
 bool ZSkipList::insertOrUpdate(double score, const std::string &value) {

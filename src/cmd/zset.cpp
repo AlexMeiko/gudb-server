@@ -6,7 +6,7 @@
 
 namespace gudb::cmd {
     // ZADD 添加/更新有序集合成员
-    std::string zaddCommand(std::vector<std::string> &args, Database &db) {
+    std::string zaddCommand(const std::vector<std::string> &args, Database &db) {
         // 参数校验：至少包含 key 和一对 score/member，且必须成对
         if (args.size() < 4) {
             return protocol::Encoder::encodeError("ERR wrong number of arguments for 'zadd' command");
@@ -55,8 +55,59 @@ namespace gudb::cmd {
         return protocol::Encoder::encodeInteger(added);
     }
 
+    // ZCARD 获取有序集合成员数量
+    std::string zcardCommand(const std::vector<std::string> &args, Database &db) {
+        if (args.size() != 2) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'zcard' command");
+        }
+
+        const std::string &key = args[1];
+
+        Object *obj = db.get(key);
+        if (!obj) {
+            return protocol::Encoder::encodeInteger(0);
+        }
+        if (obj->type != ObjType::ZSET) {
+            return protocol::Encoder::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        }
+
+        auto &zset = std::get<GZSet>(obj->value);
+        return protocol::Encoder::encodeInteger(zset.size());
+    }
+
+    // ZCOUNT 统计分数区间内成员数量
+    std::string zcountCommand(const std::vector<std::string> &args, Database &db) {
+        if (args.size() != 4) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'zcount' command");
+        }
+
+        const std::string &key = args[1];
+        const std::string &minScoreStr = args[2];
+        const std::string &maxScoreStr = args[3];
+
+        double minScore = 0.0, maxScore = 0.0;
+        auto [ptrMin, ecMin] = std::from_chars(minScoreStr.data(), minScoreStr.data() + minScoreStr.size(), minScore);
+        auto [ptrMax, ecMax] = std::from_chars(maxScoreStr.data(), maxScoreStr.data() + maxScoreStr.size(), maxScore);
+        if (ecMin != std::errc{} || ptrMin != minScoreStr.data() + minScoreStr.size() || ecMax != std::errc{} ||
+            ptrMax != maxScoreStr.data() + maxScoreStr.size()) {
+            return protocol::Encoder::encodeError("ERR value is not a valid float");
+        }
+
+        Object *obj = db.get(key);
+        if (!obj) {
+            return protocol::Encoder::encodeInteger(0);
+        }
+        if (obj->type != ObjType::ZSET) {
+            return protocol::Encoder::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        }
+
+        auto &zset = std::get<GZSet>(obj->value);
+        int cnt = zset.countByScore(minScore, maxScore);
+        return protocol::Encoder::encodeInteger(cnt);
+    }
+
     // ZRANGE 按索引范围返回成员
-    std::string zrangeCommand(std::vector<std::string> &args, Database &db) {
+    std::string zrangeCommand(const std::vector<std::string> &args, Database &db) {
         // 参数校验：必须为 key start stop
         if (args.size() != 4) {
             return protocol::Encoder::encodeError("ERR wrong number of arguments for 'zrange' command");
@@ -107,7 +158,7 @@ namespace gudb::cmd {
     }
 
     // ZRANGEBYSCORE 按分数范围返回成员
-    std::string zrangebyscoreCommand(std::vector<std::string> &args, Database &db) {
+    std::string zrangebyscoreCommand(const std::vector<std::string> &args, Database &db) {
         // 参数：key min max
         if (args.size() != 4) {
             return protocol::Encoder::encodeError("ERR wrong number of arguments for 'zrangebyscore' command");
@@ -143,6 +194,8 @@ namespace gudb::cmd {
     }
 
     static gudb::cmd::AutoRegister reg_zadd("ZADD", gudb::cmd::zaddCommand);
+    static gudb::cmd::AutoRegister reg_zcard("ZCARD", gudb::cmd::zcardCommand);
+    static gudb::cmd::AutoRegister reg_zcount("ZCOUNT", gudb::cmd::zcountCommand);
     static gudb::cmd::AutoRegister reg_zrange("ZRANGE", gudb::cmd::zrangeCommand);
     static gudb::cmd::AutoRegister reg_zrangebyscore("ZRANGEBYSCORE", gudb::cmd::zrangebyscoreCommand);
 

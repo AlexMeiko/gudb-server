@@ -30,6 +30,14 @@ private:
     std::unordered_map<std::string, double> dict_; /// member -> score 映射
 
     /**
+     * @brief 计算分数界限的排名 O(log N)
+     * @param score 分数上界
+     * @param inclusive true 统计 <= score，false 统计 < score
+     * @return 底层中不大于界限的元素个数
+     */
+    int rankByScore(double score, bool inclusive) const;
+
+    /**
      * @brief 判断节点键是否小于目标键
      * @param a 当前节点
      * @param score 目标分数
@@ -102,6 +110,14 @@ public:
      * @return 返回写入的元素个数
      */
     int getRangeByScore(double minScore, double maxScore, std::vector<std::string> &result);
+
+    /**
+     * @brief 按分数闭区间统计元素数量（O(log N)）
+     * @param minScore 最小分数（包含）
+     * @param maxScore 最大分数（包含）
+     * @return 区间内元素个数
+     */
+    int countByScore(double minScore, double maxScore) const;
 
     /**
      * @brief 插入或更新成员
