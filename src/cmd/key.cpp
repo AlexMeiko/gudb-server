@@ -1,36 +1,37 @@
-#include "Registry.h"
-#include "../protocol/Encoder.h"
 #include <algorithm>
-#include <chrono>
-#include <vector>
-#include <string>
 #include <charconv>
+#include <chrono>
+#include <string>
+#include <vector>
+#include "../protocol/Encoder.h"
+#include "Registry.h"
 
 namespace gudb::cmd {
-    // DEL 用于删除 key
+    // DEL 删除一个或多个 key
     std::string delCommand(const std::vector<std::string> &args, Database &db) {
+        // 参数校验：至少 1 个 key
         if (args.size() < 2) {
             return protocol::Encoder::encodeError("ERR wrong number of arguments for 'del' command");
         }
 
-        return protocol::Encoder::encodeInteger(std::count_if(args.begin() + 1, args.end(),
-                                                              [&db](const auto &key) { return db.remove(key); })
-        );
+        return protocol::Encoder::encodeInteger(
+                std::count_if(args.begin() + 1, args.end(), [&db](const auto &key) { return db.remove(key); }));
     }
 
-    //EXISTS 检查给定 key 是否存在
+    // EXISTS 统计存在的 key 数量
     std::string existsCommand(const std::vector<std::string> &args, Database &db) {
+        // 参数校验：至少 1 个 key
         if (args.size() < 2) {
             return protocol::Encoder::encodeError("ERR wrong number of arguments for 'exists' command");
         }
 
-        return protocol::Encoder::encodeInteger(std::count_if(args.begin() + 1, args.end(),
-                                                              [&db](const auto &key) { return db.exists(key); })
-        );
+        return protocol::Encoder::encodeInteger(
+                std::count_if(args.begin() + 1, args.end(), [&db](const auto &key) { return db.exists(key); }));
     }
 
-    // PEXPIRE	设置 key 的过期时间，以毫秒计
+    // PEXPIRE 设置毫秒级过期
     std::string pexpireCommand(const std::vector<std::string> &args, Database &db) {
+        // 参数校验：key milliseconds
         if (args.size() != 3) {
             return protocol::Encoder::encodeError("ERR wrong number of arguments for 'pexpire' command");
         }
@@ -51,16 +52,17 @@ namespace gudb::cmd {
 
         // 获取当前时间戳（毫秒）
         auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch()
-        ).count();
+                           std::chrono::system_clock::now().time_since_epoch())
+                           .count();
 
         db.setExpire(key, now + delta);
 
         return protocol::Encoder::encodeInteger(1);
     }
 
-    // PEXPIREAT	设置 key 过期时间的时间戳(unix timestamp)，以毫秒计
+    // PEXPIREAT 设置毫秒级绝对过期时间
     std::string pexpireatCommand(const std::vector<std::string> &args, Database &db) {
+        // 参数校验：key timestamp-ms
         if (args.size() != 3) {
             return protocol::Encoder::encodeError("ERR wrong number of arguments for 'pexpireat' command");
         }
@@ -85,8 +87,9 @@ namespace gudb::cmd {
     }
 
 
-    // EXPIRE	为给定 key 设置过期时间
+    // EXPIRE 设置秒级过期
     std::string expireCommand(std::vector<std::string> &args, Database &db) {
+        // 参数校验：key seconds
         if (args.size() != 3) {
             return protocol::Encoder::encodeError("ERR wrong number of arguments for 'expire' command");
         }
@@ -95,8 +98,9 @@ namespace gudb::cmd {
         return pexpireCommand(args, db);
     }
 
-    // EXPIREAT	用于为 key 设置过期时间，接受的时间参数是 UNIX 时间戳
+    // EXPIREAT 设置秒级绝对过期时间
     std::string expireatCommand(std::vector<std::string> &args, Database &db) {
+        // 参数校验：key timestamp-s
         if (args.size() != 3) {
             return protocol::Encoder::encodeError("ERR wrong number of arguments for 'expireat' command");
         }
@@ -105,10 +109,9 @@ namespace gudb::cmd {
         return pexpireatCommand(args, db);
     }
 
-    // KEYS	查找所有符合给定模式的 key
-    // MOVE	将当前数据库的 key 移动到给定的数据库中
-    // PERSIST	移除 key 的过期时间，key 将持久保持
+    // PERSIST 移除过期时间
     std::string persistCommand(const std::vector<std::string> &args, Database &db) {
+        // 参数校验：必须为 key
         if (args.size() != 2) {
             return protocol::Encoder::encodeError("ERR wrong number of arguments for 'persist' command");
         }
