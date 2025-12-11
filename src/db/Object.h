@@ -1,24 +1,22 @@
 #ifndef GUDB_OBJECT_H
 #define GUDB_OBJECT_H
 
-#include <string>
+#include "ds/ZSkipList.h"
+
 #include <deque>
+#include <iostream>
+#include <set>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include <set>
-#include <variant>
-#include <iostream>
 #include <utility>
+#include <variant>
 
 using GString = std::string;
 using GList = std::deque<std::string>;
 using GHash = std::unordered_map<std::string, std::string>;
 using GSet = std::unordered_set<std::string>;
-
-struct GZSet {
-    std::unordered_map<std::string, double> dict;
-    std::set<std::pair<double, std::string> > zsl;
-};
+using GZSet = ZSkipList;
 
 enum class ObjType { STRING, LIST, HASH, SET, ZSET };
 
@@ -41,4 +39,4 @@ public:
     explicit Object(GZSet s, long long expire = -1) : value(std::move(s)), type(ObjType::ZSET), expiresAt(expire) {}
 };
 
-#endif //GUDB_OBJECT_H
+#endif // GUDB_OBJECT_H

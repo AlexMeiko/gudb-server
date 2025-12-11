@@ -64,6 +64,11 @@ public:
      */
     ~ZSkipList();
 
+    ZSkipList(const ZSkipList &) = delete;
+    ZSkipList &operator=(const ZSkipList &) = delete;
+    ZSkipList(ZSkipList &&) noexcept = default;
+    ZSkipList &operator=(ZSkipList &&) noexcept = default;
+
     /**
      * @brief 按成员值删除
      * @param value 成员值
