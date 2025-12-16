@@ -98,9 +98,19 @@ OK
 - 列表 (List)：`LPUSH`, `LPOP`
 - 集合 (Set)：`SADD`, `SMEMBERS`
 - 哈希 (Hash)：`HSET`, `HGET`, `HINCRBY`
-- 有序集合 (ZSet)：`ZADD`, `ZCARD`, `ZCOUNT`, `ZINCRBY`, `ZLEXCOUNT`, `ZRANGE`, `ZRANGEBYSCORE`
+- 有序集合 (ZSet)：`ZADD`, `ZCARD`, `ZCOUNT`, `ZINCRBY`, `ZINTERSTORE`, `ZLEXCOUNT`, `ZRANGE`, `ZRANGEBYSCORE`
 
-> ⚠️ 部分 Redis 命令（如 `KEYS`, `RANDOMKEY`, `SETRANGE` 等）尚未实现或仅保留占位。
+> ⚠️ 命令兼容性说明：
+> - 未列出的 Redis 命令暂不支持。
+> - 部分命令仅实现基础语法/核心功能，暂不支持以下参数/选项：
+    >
+- `ZINTERSTORE`：暂不支持 `WEIGHTS` / `AGGREGATE`（聚合方式固定为 score 求和）。
+>   - `ZADD`：暂不支持 `NX` / `XX` / `CH` / `INCR`。
+>   - `ZRANGE`：暂不支持 `WITHSCORES` / `REV` / `BYSCORE` / `BYLEX` / `LIMIT`。
+>   - `ZRANGEBYSCORE`：暂不支持 `WITHSCORES` / `LIMIT`。
+>   - `HSET`：暂不支持一次写入多个字段值对。
+>   - `LPOP`：暂不支持 `LPOP key count`。
+>   - `EXPIRE` / `PEXPIRE` / `EXPIREAT` / `PEXPIREAT`：暂不支持 `NX` / `XX` / `GT` / `LT`。
 
 ---
 

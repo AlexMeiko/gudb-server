@@ -157,6 +157,14 @@ public:
     bool insertOrUpdate(double score, const std::string &value);
 
     /**
+     * @brief 查询指定成员的分数（平均 O(1)）
+     * @param value 成员值
+     * @param result 输出：成员分数
+     * @return true 表示存在并写入 result；false 表示不存在
+     */
+    bool getScore(const std::string &value, double &result) const;
+
+    /**
      * @brief 增加指定成员的分数（不存在则以 0 为初始分数）
      * @param value 成员值
      * @param increment 增量

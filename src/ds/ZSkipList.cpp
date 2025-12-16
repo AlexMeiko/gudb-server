@@ -319,6 +319,16 @@ bool ZSkipList::insertOrUpdate(double score, const std::string &value) {
     return res;
 }
 
+bool ZSkipList::getScore(const std::string &value, double &result) const {
+    auto it = dict_.find(value);
+    if (it == dict_.end()) {
+        return false;
+    }
+
+    result = it->second;
+    return true;
+}
+
 double ZSkipList::incrBy(const std::string &value, double increment) {
     double oldScore = 0.0;
     if (auto it = dict_.find(value); it != dict_.end()) {

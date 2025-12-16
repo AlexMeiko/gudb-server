@@ -56,35 +56,6 @@ namespace gudb::cmd {
         return protocol::Encoder::encodeInteger(added);
     }
 
-    // ZINCRBY 为有序集合 member 的 score 增加 increment
-    std::string zincrbyCommand(const std::vector<std::string> &args, Database &db) {
-        if (args.size() != 4) {
-            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'zincrby' command");
-        }
-
-        const std::string &key = args[1];
-        const std::string &incrementStr = args[2];
-        const std::string &member = args[3];
-
-        double increment = 0.0;
-        auto [ptr, ec] = std::from_chars(incrementStr.data(), incrementStr.data() + incrementStr.size(), increment);
-        if (ec != std::errc{} || ptr != incrementStr.data() + incrementStr.size() || std::isnan(increment)) {
-            return protocol::Encoder::encodeError("ERR value is not a valid float");
-        }
-
-        Object *obj = db.get(key);
-        if (!obj) {
-            db.set(key, Object(GZSet{}));
-            obj = db.get(key);
-        } else if (obj->type != ObjType::ZSET) {
-            return protocol::Encoder::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
-        }
-
-        auto &zset = std::get<GZSet>(obj->value);
-        double newScore = zset.incrBy(member, increment);
-        return protocol::Encoder::encodeBulkString(formatDouble(newScore));
-    }
-
     // ZCARD 获取有序集合成员数量
     std::string zcardCommand(const std::vector<std::string> &args, Database &db) {
         if (args.size() != 2) {
@@ -135,6 +106,35 @@ namespace gudb::cmd {
         auto &zset = std::get<GZSet>(obj->value);
         int cnt = zset.countByScore(minScore, minInclusive, maxScore, maxInclusive);
         return protocol::Encoder::encodeInteger(cnt);
+    }
+
+    // ZINCRBY 为有序集合 member 的 score 增加 increment
+    std::string zincrbyCommand(const std::vector<std::string> &args, Database &db) {
+        if (args.size() != 4) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'zincrby' command");
+        }
+
+        const std::string &key = args[1];
+        const std::string &incrementStr = args[2];
+        const std::string &member = args[3];
+
+        double increment = 0.0;
+        auto [ptr, ec] = std::from_chars(incrementStr.data(), incrementStr.data() + incrementStr.size(), increment);
+        if (ec != std::errc{} || ptr != incrementStr.data() + incrementStr.size() || std::isnan(increment)) {
+            return protocol::Encoder::encodeError("ERR value is not a valid float");
+        }
+
+        Object *obj = db.get(key);
+        if (!obj) {
+            db.set(key, Object(GZSet{}));
+            obj = db.get(key);
+        } else if (obj->type != ObjType::ZSET) {
+            return protocol::Encoder::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        }
+
+        auto &zset = std::get<GZSet>(obj->value);
+        double newScore = zset.incrBy(member, increment);
+        return protocol::Encoder::encodeBulkString(formatDouble(newScore));
     }
 
     // ZLEXCOUNT 统计字典序区间内成员数量
@@ -257,12 +257,94 @@ namespace gudb::cmd {
         return protocol::Encoder::encodeArray(result);
     }
 
+    std::string zinterstoreCommand(const std::vector<std::string> &args, Database &db) {
+        if (args.size() < 4) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'zinterstore' command");
+        }
+
+        const std::string &destination = args[1];
+        const std::string &numkeysStr = args[2];
+
+        long long numkeys = 0;
+        auto [ptr, ec] = std::from_chars(numkeysStr.data(), numkeysStr.data() + numkeysStr.size(), numkeys);
+        if (ec != std::errc{} || ptr != numkeysStr.data() + numkeysStr.size() || numkeys <= 0) {
+            return protocol::Encoder::encodeError("ERR value is not an integer or out of range");
+        }
+
+        const size_t expectedSize = static_cast<size_t>(numkeys) + 3;
+        if (args.size() != expectedSize) {
+            return protocol::Encoder::encodeError("ERR syntax error");
+        }
+
+        std::vector<GZSet *> zsets;
+        zsets.reserve(static_cast<size_t>(numkeys));
+
+        size_t baseIdx = 0;
+        int minSize = std::numeric_limits<int>::max();
+        for (size_t i = 3; i < args.size(); ++i) {
+            Object *obj = db.get(args[i]);
+            if (!obj) {
+                minSize = 0;
+                continue;
+            }
+            if (obj->type != ObjType::ZSET) {
+                return protocol::Encoder::encodeError(
+                        "WRONGTYPE Operation against a key holding the wrong kind of value");
+            }
+
+            auto &zset = std::get<GZSet>(obj->value);
+            const int sz = zset.size();
+            zsets.push_back(&zset);
+            if (sz < minSize) {
+                minSize = sz;
+                baseIdx = zsets.size() - 1;
+            }
+        }
+
+        if (minSize == 0) {
+            db.remove(destination);
+            return protocol::Encoder::encodeInteger(0);
+        }
+
+        std::vector<std::string> members;
+        members.reserve(static_cast<size_t>(minSize));
+        zsets[baseIdx]->getRange(0, minSize - 1, members);
+
+        GZSet result;
+        for (const auto &member: members) {
+            double totalScore = 0.0;
+            bool exists = true;
+
+            for (const GZSet *zset: zsets) {
+                double score = 0.0;
+                if (!zset->getScore(member, score)) {
+                    exists = false;
+                    break;
+                }
+                totalScore += score;
+            }
+
+            if (exists) {
+                result.insertOrUpdate(totalScore, member);
+            }
+        }
+
+        const int siz = result.size();
+        if (siz) {
+            db.set(destination, Object(std::move(result)));
+        } else {
+            db.remove(destination);
+        }
+        return protocol::Encoder::encodeInteger(siz);
+    }
+
     static gudb::cmd::AutoRegister reg_zadd("ZADD", gudb::cmd::zaddCommand);
-    static gudb::cmd::AutoRegister reg_zincrby("ZINCRBY", gudb::cmd::zincrbyCommand);
     static gudb::cmd::AutoRegister reg_zcard("ZCARD", gudb::cmd::zcardCommand);
     static gudb::cmd::AutoRegister reg_zcount("ZCOUNT", gudb::cmd::zcountCommand);
+    static gudb::cmd::AutoRegister reg_zincrby("ZINCRBY", gudb::cmd::zincrbyCommand);
     static gudb::cmd::AutoRegister reg_zlexcount("ZLEXCOUNT", gudb::cmd::zlexcountCommand);
     static gudb::cmd::AutoRegister reg_zrange("ZRANGE", gudb::cmd::zrangeCommand);
     static gudb::cmd::AutoRegister reg_zrangebyscore("ZRANGEBYSCORE", gudb::cmd::zrangebyscoreCommand);
+    static gudb::cmd::AutoRegister reg_zinterstore("ZINTERSTORE", gudb::cmd::zinterstoreCommand);
 
 } // namespace gudb::cmd

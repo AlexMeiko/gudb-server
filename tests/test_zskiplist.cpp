@@ -306,3 +306,27 @@ TEST_CASE("skip list lex count is limited to first score segment", "[zskiplist][
     list.getRangeByLex("a", "z", actual);
     REQUIRE(actual == std::vector<std::string>({"x", "y"}));
 }
+
+TEST_CASE("skip list getScore looks up member score", "[zskiplist][score][lookup]") {
+    ZSkipList list;
+    REQUIRE(list.insertOrUpdate(1.5, "a"));
+    REQUIRE(list.insertOrUpdate(2.0, "b"));
+
+    double result = 0.0;
+    REQUIRE(list.getScore("a", result));
+    REQUIRE(result == 1.5);
+    REQUIRE(list.getScore("b", result));
+    REQUIRE(result == 2.0);
+    REQUIRE_FALSE(list.getScore("c", result));
+
+    REQUIRE_FALSE(list.insertOrUpdate(1.5, "a"));
+    REQUIRE(list.getScore("a", result));
+    REQUIRE(result == 1.5);
+
+    REQUIRE_FALSE(list.insertOrUpdate(3.0, "a"));
+    REQUIRE(list.getScore("a", result));
+    REQUIRE(result == 3.0);
+
+    REQUIRE(list.eraseByValue("a"));
+    REQUIRE_FALSE(list.getScore("a", result));
+}
