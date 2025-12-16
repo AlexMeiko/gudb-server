@@ -88,7 +88,8 @@ namespace {
     // 全量遍历校验跳表与参考模型顺序一致。
     void verifyFullOrder(ZSkipList &list, const ReferenceState &ref, const std::string &label) {
         std::vector<std::string> actual;
-        list.getRangeByScore(std::numeric_limits<double>::lowest(), std::numeric_limits<double>::max(), actual);
+        list.getRangeByScore(std::numeric_limits<double>::lowest(), true, std::numeric_limits<double>::max(), true,
+                             actual);
         REQUIRE(actual == orderedValues(ref));
         INFO(label);
     }
@@ -156,7 +157,7 @@ namespace {
 
                 auto expected = rangeByScore(ref, lo, hi);
                 std::vector<std::string> actual;
-                list.getRangeByScore(lo, hi, actual);
+                list.getRangeByScore(lo, true, hi, true, actual);
                 INFO("op " << i << " seed " << seed << " score range [" << lo << ", " << hi << "]");
                 REQUIRE(actual == expected);
             } else {
@@ -244,4 +245,64 @@ TEST_CASE("skip list lexicographical ranges with equal scores", "[zskiplist][lex
     const unsigned seed = test_utils::chooseSeed() ^ 0x9E3779B9u;
     INFO("SKIPLIST_SEED=" << seed);
     randomLexRangeTest(80, 120, seed);
+}
+
+TEST_CASE("skip list lex count boundaries", "[zskiplist][lexcount]") {
+    ZSkipList list;
+    constexpr double lexScore = 3.14;
+    std::vector<std::string> values = {"alpha", "beta", "delta", "gamma"};
+    for (const auto &v: values) {
+        REQUIRE(list.insertOrUpdate(lexScore, v));
+    }
+
+    ZSkipList::LexBound min;
+    ZSkipList::LexBound max;
+
+    min.type = ZSkipList::LexBound::Type::NEG_INF;
+    max.type = ZSkipList::LexBound::Type::POS_INF;
+    REQUIRE(list.countByLex(min, max) == 4);
+
+    min.type = ZSkipList::LexBound::Type::VALUE;
+    min.value = "beta";
+    min.inclusive = true;
+    max.type = ZSkipList::LexBound::Type::VALUE;
+    max.value = "gamma";
+    max.inclusive = true;
+    REQUIRE(list.countByLex(min, max) == 3); // beta, delta, gamma
+
+    min.inclusive = false; // (beta
+    REQUIRE(list.countByLex(min, max) == 2); // delta, gamma
+
+    min.type = ZSkipList::LexBound::Type::NEG_INF;
+    max.value = "gamma";
+    max.inclusive = false; // (gamma
+    REQUIRE(list.countByLex(min, max) == 3); // alpha, beta, delta
+
+    min.type = ZSkipList::LexBound::Type::POS_INF;
+    max.type = ZSkipList::LexBound::Type::POS_INF;
+    REQUIRE(list.countByLex(min, max) == 0);
+}
+
+TEST_CASE("skip list lex count is limited to first score segment", "[zskiplist][lexcount][segment]") {
+    ZSkipList list;
+    REQUIRE(list.insertOrUpdate(-1.0, "x"));
+    REQUIRE(list.insertOrUpdate(-1.0, "y"));
+    REQUIRE(list.insertOrUpdate(0.0, "a"));
+    REQUIRE(list.insertOrUpdate(0.0, "b"));
+
+    ZSkipList::LexBound min;
+    ZSkipList::LexBound max;
+
+    min.type = ZSkipList::LexBound::Type::NEG_INF;
+    max.type = ZSkipList::LexBound::Type::POS_INF;
+    REQUIRE(list.countByLex(min, max) == 2);
+
+    min.type = ZSkipList::LexBound::Type::VALUE;
+    min.value = "y";
+    min.inclusive = true;
+    REQUIRE(list.countByLex(min, max) == 1);
+
+    std::vector<std::string> actual;
+    list.getRangeByLex("a", "z", actual);
+    REQUIRE(actual == std::vector<std::string>({"x", "y"}));
 }

@@ -107,8 +107,29 @@ ZSkipList::~ZSkipList() = default;
 int ZSkipList::rankByScore(double score, bool inclusive) const {
     ZSkipListNode *p = headers_.empty() ? nullptr : headers_.back().get();
     int cnt = 0;
+
     while (p) {
         while (p->next_ && (inclusive ? p->next_->score_ <= score : p->next_->score_ < score)) {
+            cnt += p->span_;
+            p = p->next_.get();
+        }
+
+        if (p->down_) {
+            p = p->down_;
+        } else {
+            break;
+        }
+    }
+    return cnt;
+}
+
+int ZSkipList::rankByKey(double score, const std::string &value, bool inclusive) const {
+    ZSkipListNode *p = headers_.empty() ? nullptr : headers_.back().get();
+    int cnt = 0;
+
+    while (p) {
+        while (p->next_ && (less(*p->next_, score, value) ||
+                            (inclusive && p->next_->score_ == score && p->next_->value_ == value))) {
             cnt += p->span_;
             p = p->next_.get();
         }
@@ -195,32 +216,91 @@ int ZSkipList::getRange(int l, int r, std::vector<std::string> &result) {
 int ZSkipList::getRangeByLex(const std::string &minValue, const std::string &maxValue,
                              std::vector<std::string> &result) {
     result.clear();
-    ZSkipListNode *p = findPredecessor(0.0, minValue);
-
-    for (p = p ? p->next_.get() : nullptr; p && p->value_ <= maxValue; p = p->next_.get()) {
-        result.push_back(p->value_);
-    }
-
-    return static_cast<int>(result.size());
-}
-
-int ZSkipList::getRangeByScore(double minScore, double maxScore, std::vector<std::string> &result) {
-    result.clear();
-    ZSkipListNode *p = findPredecessor(minScore);
-
-    for (p = p ? p->next_.get() : nullptr; p && p->score_ <= maxScore; p = p->next_.get()) {
-        result.push_back(p->value_);
-    }
-
-    return static_cast<int>(result.size());
-}
-
-int ZSkipList::countByScore(double minScore, double maxScore) const {
-    if (minScore > maxScore || size_ == 0) {
+    if (size_ == 0) {
         return 0;
     }
 
-    return rankByScore(maxScore, true) - rankByScore(minScore, false);
+    const ZSkipListNode *first = headers_.front()->next_.get();
+    if (!first) {
+        return 0;
+    }
+
+    const double lexScore = first->score_;
+    ZSkipListNode *p = findPredecessor(lexScore, minValue);
+
+    for (p = p ? p->next_.get() : nullptr; p && p->score_ == lexScore && p->value_ <= maxValue; p = p->next_.get()) {
+        result.push_back(p->value_);
+    }
+
+    return static_cast<int>(result.size());
+}
+
+int ZSkipList::countByLex(const LexBound &min, const LexBound &max) const {
+    if (size_ == 0) {
+        return 0;
+    }
+
+    if (min.type == LexBound::Type::POS_INF || max.type == LexBound::Type::NEG_INF) {
+        return 0;
+    }
+
+    if (min.type == LexBound::Type::VALUE && max.type == LexBound::Type::VALUE) {
+        if (min.value > max.value || (min.value == max.value && (!min.inclusive || !max.inclusive))) {
+            return 0;
+        }
+    }
+
+    const ZSkipListNode *first = headers_.front()->next_.get();
+    if (!first) {
+        return 0;
+    }
+
+    const double lexScore = first->score_;
+    const int l = min.type == LexBound::Type::VALUE ? rankByKey(lexScore, min.value, !min.inclusive) : 0;
+    const int r = max.type == LexBound::Type::VALUE ? rankByKey(lexScore, max.value, max.inclusive)
+                                                    : rankByScore(lexScore, true);
+    return std::max(0, r - l);
+}
+
+int ZSkipList::getRangeByScore(double minScore, bool minInclusive, double maxScore, bool maxInclusive,
+                               std::vector<std::string> &result) {
+    result.clear();
+    if (size_ == 0) {
+        return 0;
+    }
+
+    if (minScore > maxScore || (minScore == maxScore && (!minInclusive || !maxInclusive))) {
+        return 0;
+    }
+
+    ZSkipListNode *p = findPredecessor(minScore);
+    p = p ? p->next_.get() : nullptr;
+
+    if (!minInclusive) {
+        while (p && p->score_ == minScore) {
+            p = p->next_.get();
+        }
+    }
+
+    for (; p && (maxInclusive ? p->score_ <= maxScore : p->score_ < maxScore); p = p->next_.get()) {
+        result.push_back(p->value_);
+    }
+
+    return static_cast<int>(result.size());
+}
+
+int ZSkipList::countByScore(double minScore, bool minInclusive, double maxScore, bool maxInclusive) const {
+    if (size_ == 0) {
+        return 0;
+    }
+
+    if (minScore > maxScore || (minScore == maxScore && (!minInclusive || !maxInclusive))) {
+        return 0;
+    }
+
+    const int l = rankByScore(minScore, minInclusive ? false : true);
+    const int r = rankByScore(maxScore, maxInclusive);
+    return std::max(0, r - l);
 }
 
 bool ZSkipList::insertOrUpdate(double score, const std::string &value) {
@@ -237,6 +317,17 @@ bool ZSkipList::insertOrUpdate(double score, const std::string &value) {
     dict_[value] = score;
     insert(score, value);
     return res;
+}
+
+double ZSkipList::incrBy(const std::string &value, double increment) {
+    double oldScore = 0.0;
+    if (auto it = dict_.find(value); it != dict_.end()) {
+        oldScore = it->second;
+    }
+
+    double newScore = oldScore + increment;
+    insertOrUpdate(newScore, value);
+    return newScore;
 }
 
 int ZSkipList::size() const { return size_; }

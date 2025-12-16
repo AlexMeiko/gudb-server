@@ -98,7 +98,7 @@ OK
 - 列表 (List)：`LPUSH`, `LPOP`
 - 集合 (Set)：`SADD`, `SMEMBERS`
 - 哈希 (Hash)：`HSET`, `HGET`, `HINCRBY`
-- 有序集合 (ZSet)：`ZADD`, `ZRANGE`, `ZRANGEBYSCORE`
+- 有序集合 (ZSet)：`ZADD`, `ZCARD`, `ZCOUNT`, `ZINCRBY`, `ZLEXCOUNT`, `ZRANGE`, `ZRANGEBYSCORE`
 
 > ⚠️ 部分 Redis 命令（如 `KEYS`, `RANDOMKEY`, `SETRANGE` 等）尚未实现或仅保留占位。
 
@@ -172,7 +172,7 @@ namespace gudb::cmd {
 ## 📌 待办事项 / 已知问题
 
 - [x] **数据结构**: 完善跳表 (SkipList) 。
-- [ ] **命令补充**：`LRANGE`、`LREM`、`SREM` 以及更多 ZSet 命令（`ZREM`、`ZCARD`、`ZSCORE`、`ZRANGEBYLEX` 等）。
+- [ ] **命令补充**：`LRANGE`、`LREM`、`SREM` 以及更多 ZSet 命令（`ZREM`、`ZSCORE`、`ZRANGEBYLEX` 等）。
 - [ ] **持久化**：支持 RDB/AOF 等落盘方案。
 - [ ] **配置增强**：支持命令行参数（如 `-p <port>`）与配置文件。
 - [ ] **多系统支持**：当前依赖 Linux `epoll`，暂不支持 Windows/macOS 原生构建。

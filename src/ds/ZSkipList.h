@@ -38,6 +38,15 @@ private:
     int rankByScore(double score, bool inclusive) const;
 
     /**
+     * @brief 计算按 (score,value) 组合键的排名 O(log N)
+     * @param score 目标分数
+     * @param value 目标成员值（分数相同时按字典序比较）
+     * @param inclusive true 统计 <= (score,value)，false 统计 < (score,value)
+     * @return 底层中小于（或小于等于）目标键的元素个数
+     */
+    int rankByKey(double score, const std::string &value, bool inclusive) const;
+
+    /**
      * @brief 判断节点键是否小于目标键
      * @param a 当前节点
      * @param score 目标分数
@@ -102,22 +111,42 @@ public:
      */
     int getRangeByLex(const std::string &minValue, const std::string &maxValue, std::vector<std::string> &result);
 
+    struct LexBound {
+        enum class Type { NEG_INF, POS_INF, VALUE };
+        Type type = Type::VALUE;
+        bool inclusive = true;
+        std::string value;
+    };
+
     /**
-     * @brief 按分数闭区间获取成员列表
-     * @param minScore 最小分数（包含）
-     * @param maxScore 最大分数（包含）
+     * @brief 按字典序区间统计元素数量（O(log N)，支持开/闭区间）
+     * @param min 最小边界（-、[a、(a）
+     * @param max 最大边界（+、[z、(z）
+     * @return 区间内元素个数
+     */
+    int countByLex(const LexBound &min, const LexBound &max) const;
+
+    /**
+     * @brief 按分数区间获取成员列表（支持开/闭区间）
+     * @param minScore 最小分数
+     * @param minInclusive true 表示包含 minScore；false 表示排除 minScore
+     * @param maxScore 最大分数
+     * @param maxInclusive true 表示包含 maxScore；false 表示排除 maxScore
      * @param result 输出：按分数升序的成员值列表
      * @return 返回写入的元素个数
      */
-    int getRangeByScore(double minScore, double maxScore, std::vector<std::string> &result);
+    int getRangeByScore(double minScore, bool minInclusive, double maxScore, bool maxInclusive,
+                        std::vector<std::string> &result);
 
     /**
-     * @brief 按分数闭区间统计元素数量（O(log N)）
-     * @param minScore 最小分数（包含）
-     * @param maxScore 最大分数（包含）
+     * @brief 按分数区间统计元素数量（O(log N)，支持开/闭区间）
+     * @param minScore 最小分数
+     * @param minInclusive true 表示包含 minScore；false 表示排除 minScore
+     * @param maxScore 最大分数
+     * @param maxInclusive true 表示包含 maxScore；false 表示排除 maxScore
      * @return 区间内元素个数
      */
-    int countByScore(double minScore, double maxScore) const;
+    int countByScore(double minScore, bool minInclusive, double maxScore, bool maxInclusive) const;
 
     /**
      * @brief 插入或更新成员
@@ -126,6 +155,14 @@ public:
      * @return true 表示新插入；false 表示已存在且分数未变或被更新
      */
     bool insertOrUpdate(double score, const std::string &value);
+
+    /**
+     * @brief 增加指定成员的分数（不存在则以 0 为初始分数）
+     * @param value 成员值
+     * @param increment 增量
+     * @return 更新后的新分数
+     */
+    double incrBy(const std::string &value, double increment);
 
     /**
      * @brief 当前元素个数

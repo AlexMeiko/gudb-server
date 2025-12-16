@@ -3,6 +3,7 @@
 #include <utility>
 #include "../protocol/Encoder.h"
 #include "Registry.h"
+#include "utils.h"
 
 namespace gudb::cmd {
     // ZADD 添加/更新有序集合成员
@@ -27,7 +28,7 @@ namespace gudb::cmd {
 
             double score = 0.0;
             auto [ptr, ec] = std::from_chars(scoreStr.data(), scoreStr.data() + scoreStr.size(), score);
-            if (ec != std::errc{} || ptr != scoreStr.data() + scoreStr.size()) {
+            if (ec != std::errc{} || ptr != scoreStr.data() + scoreStr.size() || std::isnan(score)) {
                 return protocol::Encoder::encodeError("ERR value is not a valid float");
             }
 
@@ -53,6 +54,35 @@ namespace gudb::cmd {
         }
 
         return protocol::Encoder::encodeInteger(added);
+    }
+
+    // ZINCRBY 为有序集合 member 的 score 增加 increment
+    std::string zincrbyCommand(const std::vector<std::string> &args, Database &db) {
+        if (args.size() != 4) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'zincrby' command");
+        }
+
+        const std::string &key = args[1];
+        const std::string &incrementStr = args[2];
+        const std::string &member = args[3];
+
+        double increment = 0.0;
+        auto [ptr, ec] = std::from_chars(incrementStr.data(), incrementStr.data() + incrementStr.size(), increment);
+        if (ec != std::errc{} || ptr != incrementStr.data() + incrementStr.size() || std::isnan(increment)) {
+            return protocol::Encoder::encodeError("ERR value is not a valid float");
+        }
+
+        Object *obj = db.get(key);
+        if (!obj) {
+            db.set(key, Object(GZSet{}));
+            obj = db.get(key);
+        } else if (obj->type != ObjType::ZSET) {
+            return protocol::Encoder::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        }
+
+        auto &zset = std::get<GZSet>(obj->value);
+        double newScore = zset.incrBy(member, increment);
+        return protocol::Encoder::encodeBulkString(formatDouble(newScore));
     }
 
     // ZCARD 获取有序集合成员数量
@@ -86,11 +116,12 @@ namespace gudb::cmd {
         const std::string &maxScoreStr = args[3];
 
         double minScore = 0.0, maxScore = 0.0;
-        auto [ptrMin, ecMin] = std::from_chars(minScoreStr.data(), minScoreStr.data() + minScoreStr.size(), minScore);
-        auto [ptrMax, ecMax] = std::from_chars(maxScoreStr.data(), maxScoreStr.data() + maxScoreStr.size(), maxScore);
-        if (ecMin != std::errc{} || ptrMin != minScoreStr.data() + minScoreStr.size() || ecMax != std::errc{} ||
-            ptrMax != maxScoreStr.data() + maxScoreStr.size()) {
-            return protocol::Encoder::encodeError("ERR value is not a valid float");
+        bool minInclusive = true, maxInclusive = true;
+        if (auto err = parseScoreBound(minScoreStr, minScore, minInclusive); !err.empty()) {
+            return err;
+        }
+        if (auto err = parseScoreBound(maxScoreStr, maxScore, maxInclusive); !err.empty()) {
+            return err;
         }
 
         Object *obj = db.get(key);
@@ -102,7 +133,38 @@ namespace gudb::cmd {
         }
 
         auto &zset = std::get<GZSet>(obj->value);
-        int cnt = zset.countByScore(minScore, maxScore);
+        int cnt = zset.countByScore(minScore, minInclusive, maxScore, maxInclusive);
+        return protocol::Encoder::encodeInteger(cnt);
+    }
+
+    // ZLEXCOUNT 统计字典序区间内成员数量
+    std::string zlexcountCommand(const std::vector<std::string> &args, Database &db) {
+        if (args.size() != 4) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'zlexcount' command");
+        }
+
+        const std::string &key = args[1];
+        const std::string &minStr = args[2];
+        const std::string &maxStr = args[3];
+
+        Object *obj = db.get(key);
+        if (!obj) {
+            return protocol::Encoder::encodeInteger(0);
+        }
+        if (obj->type != ObjType::ZSET) {
+            return protocol::Encoder::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        }
+
+        ZSkipList::LexBound minBound, maxBound;
+        if (auto err = parseLexBound(minStr, minBound); !err.empty()) {
+            return err;
+        }
+        if (auto err = parseLexBound(maxStr, maxBound); !err.empty()) {
+            return err;
+        }
+
+        auto &zset = std::get<GZSet>(obj->value);
+        const int cnt = zset.countByLex(minBound, maxBound);
         return protocol::Encoder::encodeInteger(cnt);
     }
 
@@ -170,11 +232,13 @@ namespace gudb::cmd {
 
         // 解析分数范围
         double minScore = 0.0, maxScore = 0.0;
-        auto [ptrMin, ecMin] = std::from_chars(minScoreStr.data(), minScoreStr.data() + minScoreStr.size(), minScore);
-        auto [ptrMax, ecMax] = std::from_chars(maxScoreStr.data(), maxScoreStr.data() + maxScoreStr.size(), maxScore);
-        if (ecMin != std::errc{} || ptrMin != minScoreStr.data() + minScoreStr.size() || ecMax != std::errc{} ||
-            ptrMax != maxScoreStr.data() + maxScoreStr.size()) {
-            return protocol::Encoder::encodeError("ERR value is not a valid float");
+        bool minInclusive = true;
+        bool maxInclusive = true;
+        if (auto err = parseScoreBound(minScoreStr, minScore, minInclusive); !err.empty()) {
+            return err;
+        }
+        if (auto err = parseScoreBound(maxScoreStr, maxScore, maxInclusive); !err.empty()) {
+            return err;
         }
 
         // 获取并校验 ZSET
@@ -189,13 +253,15 @@ namespace gudb::cmd {
 
         // 获取区间内成员（闭区间）
         std::vector<std::string> result;
-        zset.getRangeByScore(minScore, maxScore, result);
+        zset.getRangeByScore(minScore, minInclusive, maxScore, maxInclusive, result);
         return protocol::Encoder::encodeArray(result);
     }
 
     static gudb::cmd::AutoRegister reg_zadd("ZADD", gudb::cmd::zaddCommand);
+    static gudb::cmd::AutoRegister reg_zincrby("ZINCRBY", gudb::cmd::zincrbyCommand);
     static gudb::cmd::AutoRegister reg_zcard("ZCARD", gudb::cmd::zcardCommand);
     static gudb::cmd::AutoRegister reg_zcount("ZCOUNT", gudb::cmd::zcountCommand);
+    static gudb::cmd::AutoRegister reg_zlexcount("ZLEXCOUNT", gudb::cmd::zlexcountCommand);
     static gudb::cmd::AutoRegister reg_zrange("ZRANGE", gudb::cmd::zrangeCommand);
     static gudb::cmd::AutoRegister reg_zrangebyscore("ZRANGEBYSCORE", gudb::cmd::zrangebyscoreCommand);
 
