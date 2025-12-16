@@ -28,4 +28,7 @@ include(GNUInstallDirs)
 add_subdirectory(src)
 
 # 单元测试
-add_subdirectory(tests)
+option(ENABLE_TESTS "Enable building tests" OFF)
+if (ENABLE_TESTS)
+    add_subdirectory(tests)
+endif ()
