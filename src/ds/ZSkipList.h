@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 /**
@@ -56,12 +57,19 @@ private:
     bool less(const ZSkipListNode &a, const double &score, const std::string &value) const;
 
     /**
-     * @brief 查找目标键的前驱（最底层）
+     * @brief 查找目标(score,value)键的前驱（最底层）
      * @param score 目标分数
      * @param value 目标值（默认空串，仅按分数定位）
      * @return 最底层小于目标键的最后一个节点
      */
-    ZSkipListNode *findPredecessor(const double &score, const std::string &value = "") const;
+    ZSkipListNode *findPredecessorByKey(const double &score, const std::string &value = "") const;
+
+    /**
+     * @brief 查找目标索引的前驱（最底层）
+     * @param index 目标索引（0-based）
+     * @return 最底层索引 < index 的最后一个节点（index==0 时为 header）
+     */
+    ZSkipListNode *findPredecessorByIndex(int index) const;
 
     /**
      * @brief 内部插入实现，不做去重检查
@@ -103,6 +111,15 @@ public:
     int getRange(int l, int r, std::vector<std::string> &result);
 
     /**
+     * @brief 按索引闭区间获取成员列表（带分数）
+     * @param l 最小索引（包含，0-based）
+     * @param r 最大索引（包含，0-based）
+     * @param result 输出：按分数升序的(score, member)列表
+     * @return 返回写入的元素个数
+     */
+    int getRange(int l, int r, std::vector<std::pair<double, std::string>> &result);
+
+    /**
      * @brief 按字典序闭区间获取成员列表,需保证Score都一致且大于0
      * @param minValue 最小成员值（包含）
      * @param maxValue 最大成员值（包含）
@@ -137,6 +154,18 @@ public:
      */
     int getRangeByScore(double minScore, bool minInclusive, double maxScore, bool maxInclusive,
                         std::vector<std::string> &result);
+
+    /**
+     * @brief 按分数区间获取成员列表（带分数，支持开/闭区间）
+     * @param minScore 最小分数
+     * @param minInclusive true 表示包含 minScore；false 表示排除 minScore
+     * @param maxScore 最大分数
+     * @param maxInclusive true 表示包含 maxScore；false 表示排除 maxScore
+     * @param result 输出：按分数升序的(score, member)列表
+     * @return 返回写入的元素个数
+     */
+    int getRangeByScore(double minScore, bool minInclusive, double maxScore, bool maxInclusive,
+                        std::vector<std::pair<double, std::string>> &result);
 
     /**
      * @brief 按分数区间统计元素数量（O(log N)，支持开/闭区间）

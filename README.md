@@ -63,6 +63,8 @@ ctest --test-dir build
 
 未安装 Catch2 时会跳过测试构建。
 
+> 说明：测试模块大部分代码暂由 AI 编写维护，目前专注主线开发
+
 ---
 
 ## 💻 使用说明
@@ -106,8 +108,8 @@ OK
     >
 - `ZINTERSTORE`：暂不支持 `WEIGHTS` / `AGGREGATE`（聚合方式固定为 score 求和）。
 >   - `ZADD`：暂不支持 `NX` / `XX` / `CH` / `INCR`。
->   - `ZRANGE`：暂不支持 `WITHSCORES` / `REV` / `BYSCORE` / `BYLEX` / `LIMIT`。
->   - `ZRANGEBYSCORE`：暂不支持 `WITHSCORES` / `LIMIT`。
+>   - `ZRANGE`：暂不支持 `REV` / `BYSCORE` / `BYLEX` / `LIMIT`。
+>   - `ZRANGEBYSCORE`：暂不支持 `LIMIT`。
 >   - `HSET`：暂不支持一次写入多个字段值对。
 >   - `LPOP`：暂不支持 `LPOP key count`。
 >   - `EXPIRE` / `PEXPIRE` / `EXPIREAT` / `PEXPIREAT`：暂不支持 `NX` / `XX` / `GT` / `LT`。

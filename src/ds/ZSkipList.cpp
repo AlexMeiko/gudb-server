@@ -26,10 +26,27 @@ bool ZSkipList::less(const ZSkipListNode &a, const double &score, const std::str
     return a.score_ < score || (a.score_ == score && a.value_ < value);
 }
 
-ZSkipListNode *ZSkipList::findPredecessor(const double &score, const std::string &value) const {
+ZSkipListNode *ZSkipList::findPredecessorByKey(const double &score, const std::string &value) const {
     ZSkipListNode *p = headers_.empty() ? nullptr : headers_.back().get();
     while (p) {
         while (p->next_ && less(*p->next_, score, value)) {
+            p = p->next_.get();
+        }
+        if (p->down_) {
+            p = p->down_;
+        } else {
+            break;
+        }
+    }
+    return p;
+}
+
+ZSkipListNode *ZSkipList::findPredecessorByIndex(int index) const {
+    ZSkipListNode *p = headers_.empty() ? nullptr : headers_.back().get();
+    int cnt = 0; // 当前节点的底层索引
+    while (p) {
+        while (p->next_ && cnt + p->span_ <= index) {
+            cnt += p->span_;
             p = p->next_.get();
         }
         if (p->down_) {
@@ -191,19 +208,7 @@ int ZSkipList::getRange(int l, int r, std::vector<std::string> &result) {
     }
 
     // 定位到 l 的前驱，O(log N)
-    ZSkipListNode *p = headers_.back().get();
-    int cnt = 0; // 当前节点的底层索引
-    while (p) {
-        while (p->next_ && cnt + p->span_ <= l) {
-            cnt += p->span_;
-            p = p->next_.get();
-        }
-        if (p->down_) {
-            p = p->down_;
-        } else {
-            break;
-        }
-    }
+    ZSkipListNode *p = findPredecessorByIndex(l);
 
     for (p = p ? p->next_.get() : nullptr; l <= r && p; ++l, p = p->next_.get()) {
         result.push_back(p->value_);
@@ -212,6 +217,22 @@ int ZSkipList::getRange(int l, int r, std::vector<std::string> &result) {
     return static_cast<int>(result.size());
 }
 
+int ZSkipList::getRange(int l, int r, std::vector<std::pair<double, std::string>> &result) {
+    result.clear();
+    l = std::max(0, l), r = std::min(r, size_ - 1);
+    if (l > r || headers_.empty() || size_ == 0) {
+        return 0;
+    }
+
+    // 定位到 l 的前驱，O(log N)
+    ZSkipListNode *p = findPredecessorByIndex(l);
+
+    for (p = p ? p->next_.get() : nullptr; l <= r && p; ++l, p = p->next_.get()) {
+        result.emplace_back(p->score_, p->value_);
+    }
+
+    return static_cast<int>(result.size());
+}
 
 int ZSkipList::getRangeByLex(const std::string &minValue, const std::string &maxValue,
                              std::vector<std::string> &result) {
@@ -226,7 +247,7 @@ int ZSkipList::getRangeByLex(const std::string &minValue, const std::string &max
     }
 
     const double lexScore = first->score_;
-    ZSkipListNode *p = findPredecessor(lexScore, minValue);
+    ZSkipListNode *p = findPredecessorByKey(lexScore, minValue);
 
     for (p = p ? p->next_.get() : nullptr; p && p->score_ == lexScore && p->value_ <= maxValue; p = p->next_.get()) {
         result.push_back(p->value_);
@@ -273,7 +294,7 @@ int ZSkipList::getRangeByScore(double minScore, bool minInclusive, double maxSco
         return 0;
     }
 
-    ZSkipListNode *p = findPredecessor(minScore);
+    ZSkipListNode *p = findPredecessorByKey(minScore);
     p = p ? p->next_.get() : nullptr;
 
     if (!minInclusive) {
@@ -284,6 +305,33 @@ int ZSkipList::getRangeByScore(double minScore, bool minInclusive, double maxSco
 
     for (; p && (maxInclusive ? p->score_ <= maxScore : p->score_ < maxScore); p = p->next_.get()) {
         result.push_back(p->value_);
+    }
+
+    return static_cast<int>(result.size());
+}
+
+int ZSkipList::getRangeByScore(double minScore, bool minInclusive, double maxScore, bool maxInclusive,
+                               std::vector<std::pair<double, std::string>> &result) {
+    result.clear();
+    if (size_ == 0) {
+        return 0;
+    }
+
+    if (minScore > maxScore || (minScore == maxScore && (!minInclusive || !maxInclusive))) {
+        return 0;
+    }
+
+    ZSkipListNode *p = findPredecessorByKey(minScore);
+    p = p ? p->next_.get() : nullptr;
+
+    if (!minInclusive) {
+        while (p && p->score_ == minScore) {
+            p = p->next_.get();
+        }
+    }
+
+    for (; p && (maxInclusive ? p->score_ <= maxScore : p->score_ < maxScore); p = p->next_.get()) {
+        result.emplace_back(p->score_, p->value_);
     }
 
     return static_cast<int>(result.size());

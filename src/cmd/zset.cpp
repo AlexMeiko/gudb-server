@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cctype>
 #include <charconv>
 #include <utility>
 #include "../protocol/Encoder.h"
@@ -170,14 +171,24 @@ namespace gudb::cmd {
 
     // ZRANGE 按索引范围返回成员
     std::string zrangeCommand(const std::vector<std::string> &args, Database &db) {
-        // 参数校验：必须为 key start stop
-        if (args.size() != 4) {
+        // 参数：key start stop [WITHSCORES]
+        if (args.size() != 4 && args.size() != 5) {
             return protocol::Encoder::encodeError("ERR wrong number of arguments for 'zrange' command");
         }
 
         const std::string &key = args[1];
         const std::string &startStr = args[2];
         const std::string &stopStr = args[3];
+
+        bool withScores = false;
+        if (args.size() == 5) {
+            std::string opt = args[4];
+            std::transform(opt.begin(), opt.end(), opt.begin(), ::toupper);
+            if (opt != "WITHSCORES") {
+                return protocol::Encoder::encodeError("ERR syntax error");
+            }
+            withScores = true;
+        }
 
         // 解析范围索引（支持负数）
         long long start = 0, stop = 0;
@@ -214,21 +225,44 @@ namespace gudb::cmd {
         }
 
         // 生成返回结果
+        if (!withScores) {
+            std::vector<std::string> result;
+            zset.getRange(static_cast<int>(l), static_cast<int>(r), result);
+            return protocol::Encoder::encodeArray(result);
+        }
+
+        std::vector<std::pair<double, std::string>> range;
+        zset.getRange(static_cast<int>(l), static_cast<int>(r), range);
+
         std::vector<std::string> result;
-        zset.getRange(static_cast<int>(l), static_cast<int>(r), result);
+        result.reserve(range.size() << 1);
+        for (const auto &[score, member]: range) {
+            result.push_back(member);
+            result.push_back(formatDouble(score));
+        }
         return protocol::Encoder::encodeArray(result);
     }
 
     // ZRANGEBYSCORE 按分数范围返回成员
     std::string zrangebyscoreCommand(const std::vector<std::string> &args, Database &db) {
-        // 参数：key min max
-        if (args.size() != 4) {
+        // 参数：key min max [WITHSCORES]
+        if (args.size() != 4 && args.size() != 5) {
             return protocol::Encoder::encodeError("ERR wrong number of arguments for 'zrangebyscore' command");
         }
 
         const std::string &key = args[1];
         const std::string &minScoreStr = args[2];
         const std::string &maxScoreStr = args[3];
+
+        bool withScores = false;
+        if (args.size() == 5) {
+            std::string opt = args[4];
+            std::transform(opt.begin(), opt.end(), opt.begin(), ::toupper);
+            if (opt != "WITHSCORES") {
+                return protocol::Encoder::encodeError("ERR syntax error");
+            }
+            withScores = true;
+        }
 
         // 解析分数范围
         double minScore = 0.0, maxScore = 0.0;
@@ -252,8 +286,21 @@ namespace gudb::cmd {
         auto &zset = std::get<GZSet>(obj->value);
 
         // 获取区间内成员（闭区间）
+        if (!withScores) {
+            std::vector<std::string> result;
+            zset.getRangeByScore(minScore, minInclusive, maxScore, maxInclusive, result);
+            return protocol::Encoder::encodeArray(result);
+        }
+
+        std::vector<std::pair<double, std::string>> range;
+        zset.getRangeByScore(minScore, minInclusive, maxScore, maxInclusive, range);
+
         std::vector<std::string> result;
-        zset.getRangeByScore(minScore, minInclusive, maxScore, maxInclusive, result);
+        result.reserve(range.size() << 1);
+        for (const auto &[score, member]: range) {
+            result.push_back(member);
+            result.push_back(formatDouble(score));
+        }
         return protocol::Encoder::encodeArray(result);
     }
 
