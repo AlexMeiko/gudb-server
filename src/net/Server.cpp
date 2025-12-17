@@ -1,15 +1,16 @@
 #include "Server.h"
-#include "../core/Logger.h"
+#include <arpa/inet.h>
+#include <cerrno>
+#include <cstdlib>
+#include <fcntl.h>
+#include <memory>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <string>
 #include <sys/epoll.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <fcntl.h>
 #include <unistd.h>
-#include <cstring>
-#include <memory>
-#include <string>
-#include <netinet/tcp.h>
+#include "../core/Logger.h"
 
 namespace gudb::net {
     Server::Server(Database *db) : epollFd_(-1), listenFd_(-1), db_(db) {
@@ -21,8 +22,12 @@ namespace gudb::net {
     }
 
     Server::~Server() {
-        close(epollFd_);
-        close(listenFd_);
+        if (epollFd_ >= 0) {
+            close(epollFd_);
+        }
+        if (listenFd_ >= 0) {
+            close(listenFd_);
+        }
     }
 
     // 启动监听
@@ -34,11 +39,16 @@ namespace gudb::net {
             return false;
         }
 
+        auto closeListenFd = [&]() {
+            close(listenFd_);
+            listenFd_ = -1;
+        };
+
         // 设置 socket 为非阻塞模式
         int flags = fcntl(listenFd_, F_GETFL, 0);
         if (fcntl(listenFd_, F_SETFL, flags | O_NONBLOCK) < 0) {
             LOG_ERROR("Failed to set non-blocking mode");
-            close(listenFd_);
+            closeListenFd();
             return false;
         }
 
@@ -52,11 +62,13 @@ namespace gudb::net {
 
         if (bind(listenFd_, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0) {
             LOG_ERROR("Failed to bind to " + ip + ":" + std::to_string(port));
+            closeListenFd();
             return false;
         }
 
         if (::listen(listenFd_, 511) < 0) {
             LOG_ERROR("Failed to listen");
+            closeListenFd();
             return false;
         }
 
@@ -85,16 +97,24 @@ namespace gudb::net {
 
             for (int i = 0; i < n; ++i) {
                 int fd = events[i].data.fd;
-
                 if (fd == listenFd_) {
                     acceptConnection();
                 } else {
-                    if (events[i].events & EPOLLIN) {
-                        handleRead(fd);
+                    auto it = connections_.find(fd);
+                    if (it == connections_.end()) {
+                        continue;
                     }
-                    if (events[i].events & EPOLLOUT) {
-                        handleWrite(fd);
+
+                    if ((events[i].events & EPOLLIN) && !it->second->handleRead()) {
+                        removeConnection(fd);
+                        continue;
                     }
+
+                    if ((events[i].events & EPOLLOUT) && !it->second->handleWrite()) {
+                        removeConnection(fd);
+                        continue;
+                    }
+
                     if (events[i].events & (EPOLLERR | EPOLLHUP | EPOLLRDHUP)) {
                         removeConnection(fd);
                     }
@@ -131,35 +151,20 @@ namespace gudb::net {
             epoll_ctl(epollFd_, EPOLL_CTL_ADD, clientFd, &ev);
 
             connections_[clientFd] = std::make_unique<Connection>(clientFd, db_, epollFd_);
-            LOG_INFO("New connection from " + std::string(inet_ntoa(clientAddr.sin_addr)) +
-                     ":" + std::to_string(ntohs(clientAddr.sin_port)));
-        }
-    }
-
-    // 处理读事件
-    // 调用对应 Connection 的 handleRead 方法
-    void Server::handleRead(int fd) {
-        auto it = connections_.find(fd);
-        if (it != connections_.end()) {
-            it->second->handleRead();
-        }
-    }
-
-    // 处理写事件
-    // 调用对应 Connection 的 handleWrite 方法
-    void Server::handleWrite(int fd) {
-        auto it = connections_.find(fd);
-        if (it != connections_.end()) {
-            it->second->handleWrite();
+            LOG_INFO("New connection from " + std::string(inet_ntoa(clientAddr.sin_addr)) + ":" +
+                     std::to_string(ntohs(clientAddr.sin_port)));
         }
     }
 
     // 移除连接
-    // 从连接映射中删除，从 epoll 中移除，关闭文件描述符
+    // 从连接映射中删除，从 epoll 中移除，对应fd 由 Connection 析构函数关闭
     void Server::removeConnection(int fd) {
-        connections_.erase(fd);
+        auto it = connections_.find(fd);
+        if (it == connections_.end()) {
+            return;
+        }
         epoll_ctl(epollFd_, EPOLL_CTL_DEL, fd, nullptr);
-        close(fd);
+        connections_.erase(it);
         LOG_INFO("Connection closed: fd=" + std::to_string(fd));
     }
 } // namespace gudb::net

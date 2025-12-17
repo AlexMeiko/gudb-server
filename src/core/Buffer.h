@@ -1,6 +1,7 @@
 #pragma once
-#include <vector>
 #include <string>
+#include <sys/types.h>
+#include <vector>
 
 namespace gudb::core {
     class Buffer {
@@ -46,6 +47,12 @@ namespace gudb::core {
          * @return size_t 可读字节数
          */
         size_t readableBytes() const;
+
+        size_t writableBytes() const;
+
+        char *beginWrite();
+
+        ssize_t readFd(int fd, int *savedErrno);
 
     private:
         std::vector<char> buf_;

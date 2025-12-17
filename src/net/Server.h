@@ -1,9 +1,9 @@
 #pragma once
-#include "../db/Database.h"
-#include "Connection.h"
-#include <unordered_map>
 #include <memory>
 #include <string>
+#include <unordered_map>
+#include "../db/Database.h"
+#include "Connection.h"
 
 namespace gudb::net {
     class Server {
@@ -31,16 +31,10 @@ namespace gudb::net {
         int epollFd_;
         int listenFd_;
         Database *db_;
-        std::unordered_map<int, std::unique_ptr<Connection> > connections_;
+        std::unordered_map<int, std::unique_ptr<Connection>> connections_;
 
         // 接受新连接，循环接受所有待处理的新连接，创建 Connection 对象并添加到 epoll
         void acceptConnection();
-
-        // 处理读事件，调用对应 Connection 的 handleRead 方法
-        void handleRead(int fd);
-
-        // 处理写事件，调用对应 Connection 的 handleWrite 方法
-        void handleWrite(int fd);
 
         // 移除连接，从连接映射中删除，从 epoll 中移除，关闭文件描述符
         void removeConnection(int fd);
