@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <charconv>
 #include <chrono>
+#include <limits>
 #include <string>
 #include <vector>
 #include "../protocol/Encoder.h"
@@ -50,12 +51,23 @@ namespace gudb::cmd {
             return protocol::Encoder::encodeError("ERR value is not an integer or out of range");
         }
 
+        if (delta <= 0) {
+            db.remove(key);
+            return protocol::Encoder::encodeInteger(1);
+        }
+
         // 获取当前时间戳（毫秒）
         auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
                            std::chrono::system_clock::now().time_since_epoch())
                            .count();
 
-        db.setExpire(key, now + delta);
+        long long expiresAt = now;
+        if (delta > std::numeric_limits<long long>::max() - now) {
+            expiresAt = std::numeric_limits<long long>::max();
+        } else {
+            expiresAt = now + delta;
+        }
+        db.setExpire(key, expiresAt);
 
         return protocol::Encoder::encodeInteger(1);
     }

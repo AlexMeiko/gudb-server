@@ -118,7 +118,12 @@ namespace gudb::protocol {
             return ParseResult::WAIT;
         }
 
-        out.assign(reader.peek(), len);
+        const char *payload = reader.peek();
+        if (payload[len] != '\r' || payload[len + 1] != '\n') {
+            return ParseResult::ERROR;
+        }
+
+        out.assign(payload, len);
         reader.retrieve(len + 2);
 
         return ParseResult::OK;

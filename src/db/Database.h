@@ -1,9 +1,9 @@
 #pragma once
-#include "Object.h"
-#include <unordered_map>
-#include <string>
 #include <chrono>
+#include <string>
+#include <unordered_map>
 #include <utility>
+#include "Object.h"
 
 namespace gudb {
     class Database {
@@ -11,9 +11,7 @@ namespace gudb {
         Database() = default;
 
         // 检查键是否存在（读取类命令使用）
-        bool exists(const std::string &key) {
-            return expireIfNeeded(key) == false && data_.contains(key);
-        }
+        bool exists(const std::string &key) { return expireIfNeeded(key) == false && data_.contains(key); }
 
         // 获取值（如果键不存在或已过期，返回 nullptr）
         // 用于读取类命令：GET、HGET、ZSCORE 等
@@ -57,29 +55,28 @@ namespace gudb {
         }
 
         // 设置值（用于类型不匹配时的覆盖）
-        void set(const std::string &key, Object obj) {
-            data_[key] = std::move(obj);
-        }
+        void set(const std::string &key, Object obj) { data_[key] = std::move(obj); }
 
         // 删除键
-        bool remove(const std::string &key) {
-            return data_.erase(key) > 0;
-        }
+        bool remove(const std::string &key) { return data_.erase(key) > 0; }
 
-        //改键名
+        // 改键名
         bool rename(const std::string &oldKey, const std::string &newKey, bool overwrite = true) {
             if (oldKey == newKey) {
-                if (expireIfNeeded(oldKey)) return false;
+                if (expireIfNeeded(oldKey))
+                    return false;
                 return data_.contains(oldKey);
             }
 
             // 源键必须存在且未过期
-            if (expireIfNeeded(oldKey)) return false;
+            if (expireIfNeeded(oldKey))
+                return false;
             expireIfNeeded(newKey);
 
             // 拿出节点
             auto nh = data_.extract(oldKey);
-            if (nh.empty()) return false;
+            if (nh.empty())
+                return false;
 
             if (!overwrite && data_.contains(newKey)) {
                 data_.insert(std::move(nh)); // 放回去
@@ -87,7 +84,8 @@ namespace gudb {
             }
 
             // 覆盖：若目标存在，删掉
-            if (overwrite) data_.erase(newKey);
+            if (overwrite)
+                data_.erase(newKey);
 
             // 改名并插回
             nh.key() = newKey;
@@ -130,6 +128,9 @@ namespace gudb {
         // 获取 key 的剩余生存时间（毫秒）
         // 返回值：-1 表示没有设置过期时间，-2 表示 key 不存在或已过期
         long long ttl(const std::string &key) {
+            if (expireIfNeeded(key)) {
+                return -2;
+            }
             auto it = data_.find(key);
             if (it == data_.end()) {
                 return -2; // key 不存在
@@ -140,8 +141,8 @@ namespace gudb {
             }
 
             auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::system_clock::now().time_since_epoch()
-            ).count();
+                               std::chrono::system_clock::now().time_since_epoch())
+                               .count();
 
             long long remaining = it->second.expiresAt - now;
             return remaining > 0 ? remaining : -2; // 已过期返回 -2
@@ -156,9 +157,9 @@ namespace gudb {
                 return false;
             }
             auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::system_clock::now().time_since_epoch()
-            ).count();
-            return now > obj.expiresAt;
+                               std::chrono::system_clock::now().time_since_epoch())
+                               .count();
+            return now >= obj.expiresAt;
         }
 
         // 惰性删除：如果过期则删除，返回是否已过期
@@ -174,4 +175,4 @@ namespace gudb {
             return false;
         }
     };
-}
+} // namespace gudb
