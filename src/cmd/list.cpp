@@ -55,6 +55,10 @@ namespace gudb::cmd {
         std::string value = std::move(list.front());
         list.pop_front();
 
+        if (list.empty()) {
+            db.remove(key);
+        }
+
         return protocol::Encoder::encodeBulkString(value);
     }
 

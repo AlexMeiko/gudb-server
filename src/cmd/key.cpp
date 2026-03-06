@@ -93,6 +93,15 @@ namespace gudb::cmd {
             return protocol::Encoder::encodeError("ERR value is not an integer or out of range");
         }
 
+        auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                           std::chrono::system_clock::now().time_since_epoch())
+                           .count();
+
+        if (timestamp <= now) {
+            db.remove(key);
+            return protocol::Encoder::encodeInteger(1);
+        }
+
         db.setExpire(key, timestamp);
 
         return protocol::Encoder::encodeInteger(1);
@@ -131,6 +140,10 @@ namespace gudb::cmd {
         const std::string &key = args[1];
 
         if (!db.exists(key)) {
+            return protocol::Encoder::encodeInteger(0);
+        }
+
+        if (db.getExpire(key) == -1) {
             return protocol::Encoder::encodeInteger(0);
         }
 

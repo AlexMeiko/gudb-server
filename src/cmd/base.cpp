@@ -6,7 +6,15 @@
 
 namespace gudb::cmd {
     // PING
-    std::string pingCommand([[maybe_unused]] const std::vector<std::string> &args, [[maybe_unused]] Database &db) {
+    std::string pingCommand(const std::vector<std::string> &args, [[maybe_unused]] Database &db) {
+        if (args.size() > 2) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'ping' command");
+        }
+
+        if (args.size() == 2) {
+            return protocol::Encoder::encodeBulkString(args[1]);
+        }
+
         return protocol::Encoder::encodeSimpleString("PONG");
     }
 
@@ -19,7 +27,11 @@ namespace gudb::cmd {
     }
 
     // TIME
-    std::string timeCommand([[maybe_unused]] const std::vector<std::string> &args, [[maybe_unused]] Database &db) {
+    std::string timeCommand(const std::vector<std::string> &args, [[maybe_unused]] Database &db) {
+        if (args.size() != 1) {
+            return protocol::Encoder::encodeError("ERR wrong number of arguments for 'time' command");
+        }
+
         auto us = std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::system_clock::now().time_since_epoch()
         ).count();

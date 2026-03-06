@@ -89,15 +89,12 @@ namespace gudb::cmd {
             return protocol::Encoder::encodeError("ERR syntax error");
         }
 
-        Object *obj = db.get(key);
-        if (obj && obj->type != ObjType::STRING) {
-            return protocol::Encoder::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
-        }
+        const bool exists = db.exists(key);
 
-        if (nx && obj) {
+        if (nx && exists) {
             return protocol::Encoder::encodeNull();
         }
-        if (xx && !obj) {
+        if (xx && !exists) {
             return protocol::Encoder::encodeNull();
         }
 
