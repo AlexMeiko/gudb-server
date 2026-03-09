@@ -90,6 +90,65 @@ OK
 
 ---
 
+## 📊 性能测试（Benchmark）
+
+以下结果基于同一台 Linux 主机的 `redis-benchmark` 压测：
+
+- `6378`：`gudb-server`
+- `6379`：官方 `Redis`
+- 工具：`redis-benchmark`
+- 连接保持开启：`-k 1`
+- 压测参数：非 pipeline 使用 `-c 10 -n 500000`，pipeline 使用 `-c 10 -n 10000000 -P 500`
+
+> 说明：压测过程中 `gudb-server` 输出 `WARNING: Could not fetch server CONFIG`，这是因为当前未实现 `CONFIG` 命令，不影响 `redis-benchmark` 对目标命令的实际压测。
+
+### 压测命令
+
+非 pipeline 场景：
+
+```bash
+redis-benchmark -p 6379 -t set,get,hset,zadd,sadd -c 10 -n 500000 -q -k 1
+redis-benchmark -p 6378 -t set,get,hset,zadd,sadd -c 10 -n 500000 -q -k 1
+```
+
+pipeline 场景：
+
+```bash
+redis-benchmark -p 6379 -t set,get,hset,zadd,sadd -c 10 -n 10000000 -P 500 -q -k 1
+redis-benchmark -p 6378 -t set,get,hset,zadd,sadd -c 10 -n 10000000 -P 500 -q -k 1
+```
+
+### 非 pipeline：与 Redis 基本持平
+
+| Command | Redis QPS | gudb QPS | 对比 |
+| --- | ---: | ---: | ---: |
+| SET  | 65,385 | 65,445 | +0.1% |
+| GET  | 66,756 | 67,060 | +0.5% |
+| SADD | 66,472 | 67,250 | +1.2% |
+| HSET | 66,216 | 66,551 | +0.5% |
+| ZADD | 66,587 | 67,531 | +1.4% |
+
+- 在 `-c 10`、无 pipeline 的条件下，`gudb-server` 与 Redis 吞吐处于同一量级。
+- 两者 `p50` 延迟均约为 `0.071 ms`。
+- 从结果来看，当前瓶颈可能不主要来自服务端实现
+
+### 深 pipeline：
+
+| Command | Redis QPS | gudb QPS | 对比 |
+| --- | ---: | ---: | ---: |
+| SET  | 1,889,288 | 2,901,915 | +53.6% |
+| GET  | 2,515,091 | 2,390,629 | -4.9% |
+| SADD | 2,158,429 | 2,306,273 | +6.8% |
+| HSET | 1,681,237 | 1,991,635 | +18.5% |
+| ZADD | 1,575,548 | 1,883,239 | +19.5% |
+
+- 深 pipeline 的收益主要来自批处理显著摊薄了 RTT、系统调用和事件循环调度开销，更聚焦于吞吐能力的测试。
+
+### 测试环境说明
+
+- 测试环境为某云 `1 vCPU / 1 GiB` Linux 实例。由于`redis-benchmark` 与服务端运行在同一台机器上，压测进程与服务端共享 CPU / 内存资源，存在一定资源竞争。
+- 因此，上述结果不应被视为独立压测环境下的绝对性能上限。
+
 ## ⚙️ 支持命令
 
 - 基础：`PING`, `ECHO`, `TIME`, `FLUSHDB`
